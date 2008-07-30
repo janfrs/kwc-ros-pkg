@@ -1,0 +1,14 @@
+<package>
+<description>Utility library for processing scanned point clouds</description>
+<author>Matei Ciocarlie</author>
+<license>BSD</license>
+<depend package="roscpp" />
+<depend package="std_msgs" />
+<depend package="newmat10" />
+<depend package="libTF" />
+<depend package="VTK" />
+<!--<depend package="xmlparam" />-->
+<export>
+  <cpp cflags="-I${prefix}/include" lflags=" -L${prefix}/lib -lscanutils -Wl,-rpath,${prefix}/lib"/>
+</export>
+</package>
