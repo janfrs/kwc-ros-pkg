@@ -1,0 +1,11 @@
+<package>
+<description brief='Kinematics and Dynamics for using KDL'>
+</description>
+<author>Advait Jain</author>
+<license>BSD</license>
+<url>http://pr.willowgarage.com</url>
+<depend package="pr2Core"/>
+<export>
+<cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lorocos-kdl -lKDL"/>
+</export>
+</package>

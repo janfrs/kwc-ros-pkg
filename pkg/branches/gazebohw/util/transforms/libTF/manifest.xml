@@ -1,0 +1,15 @@
+<package>
+<description brief='Transform Library'>
+
+Library for doing transformations.
+
+</description>
+<author>Tully Foote</author>
+<license>BSD</license>
+<url>http://pr.willowgarage.com</url>
+<depend package="newmat10"/>
+<depend package="gtest"/>
+<export>
+<cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lTF"/>
+</export>
+</package>

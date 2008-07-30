@@ -1,0 +1,22 @@
+all: newmat/newmat10
+
+newmat/newmat_1.10.4/newmat10.tar.gz:
+	mkdir -p newmat/newmat_1.10.4
+	cd newmat/newmat_1.10.4 && wget http://www.robertnz.net/ftp/newmat10.tar.gz
+
+download: newmat/newmat_1.10.4/newmat10.tar.gz
+
+newmat/newmat10: newmat/newmat_1.10.4/newmat10.tar.gz
+	cd newmat/newmat_1.10.4 && tar xzf newmat10.tar.gz
+	cd newmat/newmat_1.10.4 && patch -p1 <../../newmat_1.10.4-2build1.diff
+	cd newmat/newmat_1.10.4 && touch config.h
+	cd newmat/newmat_1.10.4 && make -f nm_gnu.mak
+	cp -r newmat/newmat_1.10.4 newmat/newmat10
+
+clean: 
+	rm -rf newmat/newmat10
+
+wipe: clean
+	rm -rf newmat
+
+.PHONY : clean wipe
