@@ -1,8 +1,0 @@
-string model_id
-robot_msgs/KinematicState start_state
-robot_msgs/KinematicState goal_state
-float64 allowed_time
-std_msgs/Point3DFloat64 volumeMin
-std_msgs/Point3DFloat64 volumeMax
----
-robot_msgs/KinematicPath path

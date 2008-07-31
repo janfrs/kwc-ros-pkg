@@ -1,4 +1,0 @@
-std_msgs/Point3DFloat32 centroid
-std_msgs/Point3DFloat32 axis1
-std_msgs/Point3DFloat32 axis2
-std_msgs/Point3DFloat32 axis3

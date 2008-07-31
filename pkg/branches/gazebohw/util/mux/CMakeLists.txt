@@ -1,5 +1,0 @@
-cmake_minimum_required(VERSION 2.6)
-include(rosbuild)
-rospack(mux)
-rospack_add_executable(mux mux.cpp)
-rospack_add_executable(switch switch.cpp)

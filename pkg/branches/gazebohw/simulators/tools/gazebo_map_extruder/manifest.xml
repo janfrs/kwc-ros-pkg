@@ -1,7 +1,0 @@
-<package>
-  <description>A ROS node that extrudes a 2D map into a (fairly) compact
-  Gazebo model.</description>
-  <author>Brian P. Gerkey</author>
-  <license>BSD</license>
-  <depend package="sdl_image" />
-</package>
