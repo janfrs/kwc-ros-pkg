@@ -1,1 +1,0 @@
-rospack_add_executable(genlog_carmen genlog_carmen.cpp)

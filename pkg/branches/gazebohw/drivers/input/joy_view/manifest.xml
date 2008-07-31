@@ -1,6 +1,0 @@
-<package>
-  <depend package="roscpp"/>
-  <depend package="std_msgs"/>
-  <depend package="joy"/>
-  <depend package="sdlgl"/>
-</package>

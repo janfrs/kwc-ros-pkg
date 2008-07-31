@@ -1,5 +1,0 @@
-cmake_minimum_required(VERSION 2.6)
-include(rosbuild)
-rospack(scan_utils)
-add_definitions(-Wall)
-rospack_add_library(scanutils src/smartScan.cpp src/dataTypes.cpp)
