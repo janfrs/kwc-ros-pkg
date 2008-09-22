@@ -426,7 +426,7 @@ WavefrontNode::goalReceived()
 
   double yaw,pitch,roll;
   btMatrix3x3 mat =  global_pose.data_.getBasis();
-  mat.getEuler(yaw, pitch, roll);
+  mat.getEulerZYX(yaw, pitch, roll);
 
   // Fill out and publish response
   this->pstate.pos.x = global_pose.data_.getOrigin().x();
@@ -663,7 +663,7 @@ WavefrontNode::doOneCycle()
         
         double yaw,pitch,roll; //fixme make cleaner namespace
         btMatrix3x3 mat =  global_pose.data_.getBasis();
-        mat.getEuler(pitch, roll, yaw);
+        mat.getEulerZYX(yaw, pitch, roll);
         
         // Are we done?
         if(plan_check_done(this->plan,
@@ -743,7 +743,7 @@ WavefrontNode::doOneCycle()
         //    double yaw,pitch,roll; //used temporarily earlier fixme make cleaner
         //btMatrix3x3 
         mat =  global_pose.data_.getBasis();
-        mat.getEuler(yaw, pitch, roll);
+        mat.getEulerZYX(yaw, pitch, roll);
 
         if(plan_compute_diffdrive_cmds(this->plan, &vx, &va,
                                        &this->rotate_dir,
