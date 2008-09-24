@@ -125,7 +125,7 @@ robot.
 #include <std_msgs/Polyline2D.h>
 
 // For transform support
-#include "tf/client.h"
+#include "tf/transform_listener.h"
 
 //Laser projection
 #include "laser_scan_utils/laser_scan.h"
@@ -224,8 +224,8 @@ class WavefrontNode: public ros::node
   
     laser_scan::LaserProjection projector_;
   public:
-    // Transform client
-    tf::TransformClient tf;
+    // Transform listener
+    tf::TransformListener tf;
 
     WavefrontNode();
     virtual ~WavefrontNode();
