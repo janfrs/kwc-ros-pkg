@@ -1,0 +1,20 @@
+<package>
+<description brief="Pylab">
+
+  Download-based ROS installer for the Pylab Python scientific
+  computing library (http://www.scipy.org/). "SciPy (pronounced "Sigh Pie") is open-source software for mathematics, science,  and engineering."
+
+</description>
+
+<author>The SciPy developers scipy-dev@scipy.org </author>
+<license>BSD</license>
+<url>http://www.scipy.org/</url>
+<depend package="numpy"/>
+<sysdepend os="osx" version="10.5.4" package="g95"/>
+<export>
+<!--
+  <doxymaker external="http://numpy.scipy.org/#NumPy" />
+-->
+</export>
+</package>
+
