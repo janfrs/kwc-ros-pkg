@@ -376,8 +376,8 @@ WavefrontNode::WavefrontNode() :
   /*  this->tf.setWithEulers("base_laser",
                          "base",
                          laser_x_offset, 0.0, 0.0, 0.0, 0.0, 0.0, 0);*/
-  this->tf.setTransform(tf::Stamped<btTransform>(btTransform(btQuaternion(0,0,0), btVector3(laser_x_offset, 0,0)), 0, "base_laser"), "base");
-  this->tf.setTransform(tf::Stamped<btTransform>(btTransform(btQuaternion(0,0,0), btVector3(laser_x_offset, 0,0)), 0, "map"), "other");///\todo fixme hack to get around short list edge case
+  this->tf.setTransform(tf::Stamped<btTransform>(btTransform(btQuaternion(0,0,0), btVector3(laser_x_offset, 0,0)), 0, "base_laser", "base"));
+  this->tf.setTransform(tf::Stamped<btTransform>(btTransform(btQuaternion(0,0,0), btVector3(laser_x_offset, 0,0)), 0, "map", "other"));///\todo fixme hack to get around short list edge case
 
   advertise<std_msgs::Planner2DState>("state");
   advertise<std_msgs::Polyline2D>("gui_path");
@@ -607,7 +607,7 @@ WavefrontNode::doOneCycle()
   // Get the current robot pose in the map frame
   //convert!
   
-  tf::Stamped<btTransform> robotPose;
+  tf::Stamped<tf::Pose> robotPose;
   robotPose.data_.setIdentity();
   robotPose.frame_id_ = "base";
   robotPose.stamp_ = 0; // request most recent pose
@@ -615,7 +615,7 @@ WavefrontNode::doOneCycle()
   //        laserMsg.header.stamp.nsec; ///HACKE FIXME we should be able to get time somewhere else
   try
   {
-    this->tf.transformStamped("map", robotPose, global_pose);
+    this->tf.transformPose("map", robotPose, global_pose);
   }
   catch(tf::LookupException& ex)
   {
