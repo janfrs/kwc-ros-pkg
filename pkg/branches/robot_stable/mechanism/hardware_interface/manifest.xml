@@ -1,0 +1,12 @@
+<package>
+<description brief="Hardware Interface">
+</description>
+<author>Eric Berger berger@willowgarage.com</author>
+<license>BSD</license>
+<url>http://pr.willowgarage.com</url>
+<depend package="stl_utils" />
+<export>
+  <cpp cflags="-I${prefix}/include"/>
+</export>
+</package>
+

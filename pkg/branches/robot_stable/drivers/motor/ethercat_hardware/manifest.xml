@@ -1,0 +1,20 @@
+<package>
+<description brief='EtherCAT Hardware'>
+Package for creating a hardware interface to the robot using the EtherCAT motor controller/driver
+</description>
+<author>Rob Wheeler (email: wheeler@willowgarage.com)</author>
+<license>BSD</license>
+<url>http://pr.willowgarage.com</url>
+<depend package='hardware_interface'/>
+<depend package='eml'/>
+<depend package='tinyxml'/>
+<depend package='roscpp' />
+<depend package='loki' />
+<depend package='misc_utils' />
+<depend package='robot_msgs' />
+<depend package='boost' />
+<export>
+  <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -lethercat_hardware -Wl,-rpath,${prefix}/lib"/>
+</export>
+<repository>http://pr.willowgarage.com/repos</repository>
+</package>

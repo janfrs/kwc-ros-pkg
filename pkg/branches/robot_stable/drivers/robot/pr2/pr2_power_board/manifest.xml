@@ -1,0 +1,9 @@
+<package>
+  <description>This is a driver for the PR2 Power Board</description>
+  <author>Tully Foote</author>
+  <license>BSD</license>
+  <depend package="roscpp" />
+  <depend package="rospy" />
+  <depend package="rosthread" />
+  <depend package="robot_msgs" />
+</package>
