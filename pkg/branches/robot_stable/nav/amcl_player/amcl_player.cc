@@ -82,29 +82,25 @@ Publishes to (name / type):
 @todo Expose the various amcl parameters via ROS.
 
  **/
-
-#include <deque>
-
-#include "rosconsole/rosassert.h"
+#include <assert.h>
 
 // For core Player stuff (message queues, config file objects, etc.)
-#include "libplayercore/playercore.h"
+#include <libplayercore/playercore.h>
 // TODO: remove XDR dependency
-#include "libplayerxdr/playerxdr.h"
+#include <libplayerxdr/playerxdr.h>
 
 // roscpp
-#include "ros/node.h"
+#include <ros/node.h>
 
 // Messages that I need
-#include "std_msgs/LaserScan.h"
-#include "std_msgs/RobotBase2DOdom.h"
-#include "std_msgs/ParticleCloud2D.h"
-#include "std_msgs/Pose2DFloat32.h"
-#include "std_srvs/StaticMap.h"
+#include <std_msgs/LaserScan.h>
+#include <std_msgs/RobotBase2DOdom.h>
+#include <std_msgs/ParticleCloud2D.h>
+#include <std_msgs/Pose2DFloat32.h>
+#include <std_srvs/StaticMap.h>
 
 // For transform support
-#include "tf/transform_broadcaster.h"
-#include "tf/transform_listener.h"
+#include <tf/transform_broadcaster.h>
 
 // compute linear index for given map coords
 #define MAP_IDX(sx, i, j) ((sx) * (j) + (i))
@@ -137,9 +133,7 @@ class AmclNode: public ros::node, public Driver
     int setPose(double x, double y, double a);
 
   private:
-    tf::TransformBroadcaster* tf;
-    tf::TransformListener* tfL;
-
+  tf::TransformBroadcaster* tf;
     ConfigFile* cf;
 
     // incoming messages
@@ -178,12 +172,6 @@ class AmclNode: public ros::node, public Driver
 
     ros::Duration cloud_pub_interval;
     ros::Time last_cloud_pub_time;
-
-    // Helper to get odometric pose from transform system
-    bool getOdomPose(double& x, double& y, double& yaw, const ros::Time& t);
-
-    // buffer of not-yet-transformed scans
-    std::deque<std_msgs::LaserScan> laser_scans;
 };
 
 #define USAGE "USAGE: amcl_player"
@@ -196,8 +184,8 @@ main(int argc, char** argv)
   AmclNode an;
 
   // Start up the robot
-  //if(an.start() != 0)
-    //exit(-1);
+  if(an.start() != 0)
+    exit(-1);
 
   /////////////////////////////////////////////////////////////////
   // Main loop; grab messages off our queue and republish them via ROS
@@ -225,6 +213,12 @@ AmclNode::AmclNode() :
 
   // TODO: remove XDR dependency
   playerxdr_ftable_init();
+
+  advertise<std_msgs::RobotBase2DOdom>("localizedpose",2);
+  advertise<std_msgs::ParticleCloud2D>("particlecloud",2);
+  subscribe("odom", odomMsg, &AmclNode::odomReceived,2);
+  subscribe("scan", laserMsg, &AmclNode::laserReceived,2);
+  subscribe("initialpose", initialPoseMsg, &AmclNode::initialPoseReceived,2);
 
   // get map via RPC
   std_srvs::StaticMap::request  req;
@@ -261,7 +255,7 @@ AmclNode::AmclNode() :
   /// way of retrieving such Txs;
   //
   // retrieve static laser transform, if it's available
-  param("laser_x_offset", laser_x_offset, 0.0);
+  param("laser_x_offset", laser_x_offset, 0.05);
   
   //assert(read_map_from_image(&this->sx, &this->sy, &this->mapdata, fname, 0)
          //== 0);
@@ -305,19 +299,19 @@ AmclNode::AmclNode() :
 
   this->position2d_dev = deviceTable->AddDevice(this->position2d_addr, 
                                                 NULL, false);
-  ROS_ASSERT(this->position2d_dev);
+  assert(this->position2d_dev);
   this->position2d_dev->InQueue = QueuePointer(this->Driver::InQueue);
   this->position2d_dev->driver = (Driver*)this;
 
   this->laser_dev = deviceTable->AddDevice(this->laser_addr, 
                                            NULL, false);
-  ROS_ASSERT(this->laser_dev);
+  assert(this->laser_dev);
   this->laser_dev->InQueue = QueuePointer(this->Driver::InQueue);
   this->laser_dev->driver = (Driver*)this;
 
   this->map_dev = deviceTable->AddDevice(this->map_addr, 
                                          NULL, false);
-  ROS_ASSERT(this->map_dev);
+  assert(this->map_dev);
   this->map_dev->InQueue = QueuePointer(this->Driver::InQueue);
   this->map_dev->driver = (Driver*)this;
 
@@ -340,7 +334,7 @@ AmclNode::AmclNode() :
 
   // Turn this on for serious AMCL debugging, but you must have built
   // player with ENABLE_RTKGUI=ON.
-  this->cf->InsertFieldValue(0,"enable_gui","0");
+  //this->cf->InsertFieldValue(0,"enable_gui","1");
 
   // Grab params off the param server
   int max_beams, min_samples, max_samples;
@@ -402,7 +396,7 @@ AmclNode::AmclNode() :
   // Create an instance of the driver, passing it the ConfigFile object.
   // The -1 tells it to look into the "global" section of the ConfigFile,
   // which is where ConfigFile::InsertFieldValue() put the parameters.
-  ROS_ASSERT((this->driver = AdaptiveMCL_Init(cf, -1)));
+  assert((this->driver = AdaptiveMCL_Init(cf, -1)));
 
   // Print out warnings about parameters that were set, but which the
   // driver never looked at.
@@ -410,8 +404,10 @@ AmclNode::AmclNode() :
 
   // Grab from the global deviceTable a pointer to the Device that was 
   // created as part of the driver's initialization.
-  ROS_ASSERT((this->pdevice = deviceTable->GetDevice(oposition2d_saddr,false)));
-  ROS_ASSERT((this->ldevice = deviceTable->GetDevice(olocalize_addr,false)));
+  assert((this->pdevice = deviceTable->GetDevice(oposition2d_saddr,false)));
+  assert((this->ldevice = deviceTable->GetDevice(olocalize_addr,false)));
+
+  this->tf = new tf::TransformBroadcaster(*this);
 
   double startX, startY, startTH;
   param("robot_x_start", startX, 0.0);
@@ -420,24 +416,6 @@ AmclNode::AmclNode() :
   this->setPose(startX, startY, startTH);
 
   cloud_pub_interval.fromSec(1.0);
-
-  start();
-
-  // Give Player a chance to start up, under heavy load conditions.
-  // TODO: remove this.
-  usleep(5000000);
-
-  this->tf = new tf::TransformBroadcaster(*this);
-  this->tfL = new tf::TransformListener(*this, true, 
-                                        10000000000ULL,
-                                          200000000ULL);
-                                         
-
-  advertise<std_msgs::RobotBase2DOdom>("localizedpose",2);
-  advertise<std_msgs::ParticleCloud2D>("particlecloud",2);
-  //subscribe("odom", odomMsg, &AmclNode::odomReceived,2);
-  subscribe("scan", laserMsg, &AmclNode::laserReceived,2);
-  subscribe("initialpose", initialPoseMsg, &AmclNode::initialPoseReceived,2);
 }
 
 AmclNode::~AmclNode()
@@ -466,14 +444,9 @@ AmclNode::ProcessMessage(QueuePointer &resp_queue,
     // publish new transform robot->map
     ros::Time t;
     t.fromSec(hdr->timestamp);
-    /*
     this->tf->sendTransform(tf::Stamped<tf::Transform> (tf::Transform(tf::Quaternion(pdata->pos.pa, 0, 0), 
-                                                                      tf::Point(pdata->pos.px, pdata->pos.py, 0.0)),
-                                                        t, "base","map"));
-                                                        */
-    this->tf->sendTransform(tf::Stamped<tf::Transform> (tf::Transform(tf::Quaternion(pdata->pos.pa, 0, 0), 
-                                                                      tf::Point(pdata->pos.px, pdata->pos.py, 0.0)).inverse(),
-                                                        t, "map", "base"));
+                                                                  tf::Point(pdata->pos.px, pdata->pos.py, 0.0)),
+                                                    t, "base","map"));
 
     /*
     printf("lpose: (%.3f %.3f %.3f) @ (%llu:%llu)\n",
@@ -498,13 +471,6 @@ AmclNode::ProcessMessage(QueuePointer &resp_queue,
       // WTF is this?
       printf("Somehow could not set frame_id to map\n");
     }
-    /*
-    printf("O: %.6f %.3f %.3f %.3f\n",
-           hdr->timestamp, 
-           localizedOdomMsg.pos.x, 
-           localizedOdomMsg.pos.y, 
-           localizedOdomMsg.pos.th);
-           */
     publish("localizedpose", localizedOdomMsg);
 
     if((ros::Time::now() - this->last_cloud_pub_time) >= cloud_pub_interval)
@@ -576,7 +542,7 @@ AmclNode::ProcessMessage(QueuePointer &resp_queue,
     sj = mapresp.height = mapreq->height;
     mapresp.data_count = mapresp.width * mapresp.height;
     mapresp.data = new int8_t [mapresp.data_count];
-    ROS_ASSERT(mapresp.data);
+    assert(mapresp.data);
     // Grab the pixels from the map
     for(j = 0; j < sj; j++)
     {
@@ -705,109 +671,81 @@ AmclNode::setPose(double x, double y, double a)
   return(0);
 }
 
-bool
-AmclNode::getOdomPose(double& x, double& y, double& yaw, const ros::Time& t)
-{
-  // Get the robot's pose 
-  tf::Stamped<tf::Pose> ident (btTransform(btQuaternion(0,0,0), 
-                                           btVector3(0,0,0)), t, "base_laser");
-  tf::Stamped<btTransform> odom_pose;
-  try
-  {
-    this->tfL->transformPose("odom", ident, odom_pose);
-  }
-  catch(tf::TransformException e)
-  {
-    //ROS_WARN("Failed to compute odom pose, skipping scan (%s)", e.what());
-    return false;
-  }
-  x = odom_pose.getOrigin().x();
-  y = odom_pose.getOrigin().y();
-  double pitch,roll;
-  odom_pose.getBasis().getEulerZYX(yaw, pitch, roll);
-
-  return true;
-}
-
 void
 AmclNode::laserReceived()
 {
-  // Put it on the queue
-  std_msgs::LaserScan newscan(laserMsg);
-  laser_scans.push_back(newscan);
-
-  // Process the queued scans
-  while(!laser_scans.empty())
+  // Where was the robot when this scan was taken?
+  /*
+  libTF::TFPose2D robotPose;
+  robotPose.x = robotPose.y = robotPose.yaw = 0.0;
+  robotPose.frame = "base";
+  robotPose.time = laserMsg.header.stamp.toNSec();
+  libTF::TFPose2D odomPose;
+  try
   {
-    std_msgs::LaserScan scan = laser_scans.front();
-    
-    // Where was the robot when this scan was taken?
-    double x, y, yaw;
-    if(!getOdomPose(x, y, yaw, scan.header.stamp))
-      break;
-
-    laser_scans.pop_front();
-
-    double timestamp = scan.header.stamp.to_double();
-    //printf("I: %.6f %.3f %.3f %.3f\n",
-           //timestamp, x, y, yaw);
-
-    // Synthesize an odometry message
-    player_position2d_data_t pdata_odom;
-    pdata_odom.pos.px = x;
-    pdata_odom.pos.py = y;
-    pdata_odom.pos.pa = yaw;
-    pdata_odom.vel.px = 0.0;
-    pdata_odom.vel.py = 0.0;
-    pdata_odom.vel.pa = 0.0;
-    pdata_odom.stall = 0;
-
-    this->Driver::Publish(this->position2d_addr,
-                          PLAYER_MSGTYPE_DATA,
-                          PLAYER_POSITION2D_DATA_STATE,
-                          (void*)&pdata_odom,0,
-                          &timestamp);
-
-
-    // Got new scan; reformat and pass it on
-    player_laser_data_t pdata;
-    pdata.min_angle = scan.angle_min;
-    pdata.max_angle = scan.angle_max;
-    pdata.resolution = scan.angle_increment;
-    // HACK, until the hokuyourg_player node is fixed
-    if(scan.range_max > 0.1)
-      pdata.max_range = scan.range_max;
-    else
-      pdata.max_range = 30.0;
-    pdata.ranges_count = scan.get_ranges_size();
-    pdata.ranges = new float[pdata.ranges_count];
-    ROS_ASSERT(pdata.ranges);
-    // We have to iterate over, rather than block copy, the ranges, because
-    // we have to filter out short readings.
-    for(unsigned int i=0;i<pdata.ranges_count;i++)
-    {
-      // Player doesn't have a concept of min range.  So we'll map short
-      // readings to max range.
-      if(scan.ranges[i] <= scan.range_min)
-        pdata.ranges[i] = scan.range_max;
-      else
-        pdata.ranges[i] = scan.ranges[i];
-    }
-    pdata.intensity_count = scan.get_intensities_size();
-    pdata.intensity = new uint8_t[pdata.intensity_count];
-    ROS_ASSERT(pdata.intensity);
-    memset(pdata.intensity,0,sizeof(uint8_t)*pdata.intensity_count);
-    pdata.id = scan.header.seq;
-
-    this->Driver::Publish(this->laser_addr,
-                          PLAYER_MSGTYPE_DATA,
-                          PLAYER_LASER_DATA_SCAN,
-                          (void*)&pdata,0,
-                          &timestamp);
-
-    delete[] pdata.ranges;
-    delete[] pdata.intensity;
+    odomPose = this->tfClient.transformPose2D("odom", robotPose);
   }
+  catch(...)
+  {
+    puts("exception");
+  }
+
+  printf("pose: %.3f %.3f %.3f\n",
+         odomPose.x,
+         odomPose.y,
+         odomPose.yaw);
+         */
+
+
+  // Got new scan; reformat and pass it on
+  player_laser_data_t pdata;
+  pdata.min_angle = this->laserMsg.angle_min;
+  pdata.max_angle = this->laserMsg.angle_max;
+  pdata.resolution = this->laserMsg.angle_increment;
+  // HACK, until the hokuyourg_player node is fixed
+  if(this->laserMsg.range_max > 0.1)
+    pdata.max_range = this->laserMsg.range_max;
+  else
+    pdata.max_range = 30.0;
+  pdata.ranges_count = this->laserMsg.get_ranges_size();
+  pdata.ranges = new float[pdata.ranges_count];
+  assert(pdata.ranges);
+  // We have to iterate over, rather than block copy, the ranges, because
+  // we have to filter out short readings.
+  for(unsigned int i=0;i<pdata.ranges_count;i++)
+  {
+    // Player doesn't have a concept of min range.  So we'll map short
+    // readings to max range.
+    if(this->laserMsg.ranges[i] <= this->laserMsg.range_min)
+      pdata.ranges[i] = this->laserMsg.range_max;
+    else
+      pdata.ranges[i] = this->laserMsg.ranges[i];
+  }
+  pdata.intensity_count = this->laserMsg.get_intensities_size();
+  pdata.intensity = new uint8_t[pdata.intensity_count];
+  assert(pdata.intensity);
+  /*
+  for(unsigned int i=0;i<pdata.intensity_count;i++)
+  {
+    // AMCL doesn't care about intensity data
+    //pdata.intensity[i] = this->laserMsg.intensities[i];
+    pdata.intensity[i] = 0;
+  }
+  */
+  ///\todo Optimize from above (not working at right) 
+  memset(pdata.intensity,0,sizeof(uint8_t)*pdata.intensity_count);
+  pdata.id = this->laserMsg.header.seq;
+
+  double timestamp = this->laserMsg.header.stamp.to_double();
+
+  this->Driver::Publish(this->laser_addr,
+                        PLAYER_MSGTYPE_DATA,
+                        PLAYER_LASER_DATA_SCAN,
+                        (void*)&pdata,0,
+                        &timestamp);
+
+  delete[] pdata.ranges;
+  delete[] pdata.intensity;
 }
 
 void 
