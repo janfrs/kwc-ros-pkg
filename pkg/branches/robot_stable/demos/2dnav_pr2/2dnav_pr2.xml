@@ -16,12 +16,12 @@
     <param name="deadman_button" value="4" type="int"/>
     <node pkg="teleop_base" type="teleop_base" args="--deadman_no_publish" output="screen"/>
 
-    <node pkg="map_server" type="map_server" args="$(find 2dnav_stage)/willow-full-0.05.pgm 0.05" respawn="false" />
+    <node pkg="map_server" type="map_server" args="$(find 2dnav_stage)/empty_room_5cm.pgm 0.05" respawn="false" />
     <param name="laser_x_offset" type="double" value=".275" />
     <param name="pf_laser_max_beams" value="20"/>
     <param name="pf_min_samples" value="500"/>
     <param name="pf_max_samples" value="10000"/>
-    <param name="pf_odom_drift_xx" value="0.5"/>
+    <param name="pf_odom_drift_xx" value="0.2"/>
     <param name="pf_odom_drift_yy" value="0.2"/>
     <param name="pf_odom_drift_aa" value="0.2"/>
     <param name="pf_odom_drift_xa" value="0.2"/>
