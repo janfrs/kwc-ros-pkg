@@ -1,0 +1,8 @@
+<!-- Should deprecate this file -->
+<launch>
+  <master auto="start"/>
+  <group name="wg">
+    <include file="$(find highlevel_controllers)/test/launch_stage_5cm.xml" />
+  </group>
+</launch>
+

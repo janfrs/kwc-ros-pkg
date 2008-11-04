@@ -1,0 +1,2 @@
+rospack_add_executable(print_scans print_scans.cpp)
+target_link_libraries(pthread)
