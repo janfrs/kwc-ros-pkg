@@ -1,0 +1,28 @@
+<package>
+<description brief="Stage">
+
+This package contains Stage, from the Player Project
+(http://playerstage.sf.net). This package does not modify Stage in any
+way; it simply provides a convenient way to download and compile the
+headers and libraries in a way that can be managed by the ROS dependency
+system.
+
+</description>
+<author>Richard Vaughan, with contributions from many others. See web page for a full credits list.</author>
+<license>GPL</license>
+<url>http://playerstage.sf.net</url>
+<export>
+  <cpp lflags="-Wl,-rpath,${prefix}/stage/lib `PKG_CONFIG_PATH=${prefix}/stage/lib/pkgconfig:$PKG_CONFIG_PATH pkg-config --libs stage`" cflags="`PKG_CONFIG_PATH=${prefix}/stage/lib/pkgconfig:$PKG_CONFIG_PATH pkg-config --cflags stage`"/>
+  <doxymaker external="http://playerstage.sourceforge.net/doc/stage-cvs"/>
+</export>
+<versioncontrol type="svn" url="https://playerstage.svn.sourceforge.net/svnroot/playerstage/code/stage/branches/stage-ros"/>
+<sysdepend os="ubuntu" version="8.04-hardy" package="autoconf"/>
+<sysdepend os="ubuntu" version="8.04-hardy" package="automake"/>
+<sysdepend os="ubuntu" version="8.04-hardy" package="libtool"/>
+<sysdepend os="ubuntu" version="8.04-hardy" package="libgtk2.0-dev"/>
+<sysdepend os="ubuntu" version="8.04-hardy" package="libfltk1.1-dev"/>
+<sysdepend os="ubuntu" version="8.04-hardy" package="libltdl3-dev"/>
+<sysdepend os="ubuntu" version="8.04-hardy" package="pkg-config"/>
+</package>
+
+
