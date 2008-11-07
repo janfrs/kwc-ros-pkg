@@ -1,0 +1,14 @@
+<package>
+  <description brief="vop">
+      a fast vector module for Python
+  </description>
+  <author>James Bowman</author>
+  <license>BSD</license>
+  <export>
+  </export>
+  <sysdepend os="ubuntu" version="7.04-fiesty" package="nasm"/>
+  <sysdepend os="ubuntu" version="8.04-hardy" package="nasm"/>
+  <sysdepend os="ubuntu" version="7.04-feisty" package="wget"/>
+  <sysdepend os="ubuntu" version="8.04-hardy" package="wget"/>
+</package>
+
