@@ -1,1 +1,0 @@
-rospack_add_executable(base_actual_extract base_actual_extract.cpp)
