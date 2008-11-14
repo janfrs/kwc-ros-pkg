@@ -1,9 +1,0 @@
-<package>
-  <description>A ROS node that simply forwards odometry information.</description>
-  <author>Ioan A. Sucan</author>
-  <license>BSD</license>
-  <depend package="roscpp" />
-  <depend package="robot_msgs" />
-  <depend package="rosTF" />
-  <depend package="math_utils" />
-</package>
