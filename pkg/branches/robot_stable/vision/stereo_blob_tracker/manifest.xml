@@ -1,0 +1,23 @@
+<package>
+<description brief="Blob tracking by camshift">
+
+Stereo Blob tracking by camshift/meanshift.
+
+
+</description>
+<author> Caroline Pantofaru, JD Chen
+</author>
+<license>BSD</license>
+<review status="unreviewed" notes=""/>
+<url>http://www.willowgarage.com</url>
+<depend package="roscpp"/>
+<depend package="std_msgs"/>
+<depend package="std_srvs"/>
+<depend package="rosthread"/>
+<depend package="axis_cam"/>
+<depend package="string_utils"/>
+<depend package="image_utils"/>
+<depend package="pr2_mechanism_controllers"/>
+<depend package="stereo_utils"/>
+</package>
+
