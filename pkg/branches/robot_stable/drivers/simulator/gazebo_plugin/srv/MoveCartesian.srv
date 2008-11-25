@@ -1,0 +1,3 @@
+pr2_msgs/MoveEndEffectorState e
+---
+int32 reachable
