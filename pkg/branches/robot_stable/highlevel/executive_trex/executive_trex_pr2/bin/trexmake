@@ -1,4 +1,0 @@
-pushd `pwd`
-cd ..
-make
-popd

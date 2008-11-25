@@ -1,1 +1,0 @@
-rospack_add_executable(localize_extract localize_extract.cpp)
