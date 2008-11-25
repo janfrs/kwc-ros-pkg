@@ -1,0 +1,20 @@
+<package>
+<description brief="Mechanism model">
+</description>
+<author>Eric Berger berger@willowgarage.com</author>
+<license>BSD</license>
+<review status="unreviewed" notes="API review in progress (Eric)"/>
+<depend package="roscpp" />
+<depend package="hardware_interface" />
+<depend package="stl_utils" />
+<depend package="loki" />
+<depend package="tinyxml" />
+<depend package="wg_robot_description_parser" />
+<depend package="tf" />
+<depend package="control_toolbox" />
+<depend package="bullet" />
+<url>http://pr.willowgarage.com</url>
+<export>
+  <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -lmechanism_model -Wl,-rpath,${prefix}/lib"/>
+</export>
+</package>

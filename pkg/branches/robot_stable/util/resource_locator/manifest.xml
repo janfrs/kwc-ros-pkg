@@ -1,0 +1,21 @@
+<package>
+  <description brief="Resource Locator">
+
+    This package provides a simple library that allows locating
+    resources within ROS.
+
+  </description>
+  <author>Rosen Diankov, Ioan Sucan </author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+
+  <depend package="rosconsole" />
+
+  <export>
+    <cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lresource_locator"/>
+  </export>
+
+  <sysdepend os="ubuntu" version="7.10-gutsy" package="libboost-regex-dev"/>
+  <sysdepend os="ubuntu" version="8.04-hardy" package="libboost-regex-dev"/>
+  <sysdepend os="ubuntu" version="8.10-intrepid" package="libboost-regex-dev"/>
+</package>

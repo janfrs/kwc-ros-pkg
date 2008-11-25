@@ -1,0 +1,1920 @@
+Index: player/SConscript
+===================================================================
+--- player/SConscript	(revision 7143)
++++ player/SConscript	(working copy)
+@@ -1,7 +1,8 @@
+ import os
+ Import('env install_prefix sharedObjs subdirs')
+ 
+-parseConfigs = ['pkg-config --cflags --libs playerc++']
++parseConfigs = ['pkg-config --cflags --libs playerc++',
++                'pkg-config --cflags --libs playerc']
+ 
+ sources = ['GazeboDriver.cc',
+            'GazeboClient.cc',
+Index: libgazebo/Client.cc
+===================================================================
+--- libgazebo/Client.cc	(revision 7143)
++++ libgazebo/Client.cc	(working copy)
+@@ -189,8 +189,14 @@
+ {
+   this->semKey = GZ_SEM_KEY + this->serverId;
+ 
+-  // Get the client semaphore group
+-  this->semId = semget(this->semKey, 0, S_IRWXU);
++  // While loop to wait for directory
++  this->semId = -1;
++  while(this->semId < 0)
++  {
++    // Get the client semaphore group
++    this->semId = semget(this->semKey, 0, S_IRWXU);
++    usleep(1000000);
++  }
+ 
+   if (this->semId < 0)
+   {
+Index: libgazebo/SConscript
+===================================================================
+--- libgazebo/SConscript	(revision 7143)
++++ libgazebo/SConscript	(working copy)
+@@ -20,6 +20,8 @@
+ # setup a special build environment for libgazebo. Do this so we can control
+ # what libgazebo depends upon
+ #
++#  CC = '/opt/intel/cc/10.1.008/bin/icpc',
++#  CXX = '/opt/intel/cc/10.1.008/bin/icpc',
+ env = Environment (
+   CC = 'g++',
+   CCFLAGS = Split ('-pthread -pipe  -W -Wall -O2'),
+Index: libgazebo/Iface.cc
+===================================================================
+--- libgazebo/Iface.cc	(revision 7143)
++++ libgazebo/Iface.cc	(working copy)
+@@ -264,6 +264,12 @@
+ 
+   // Open the mmap file
+   this->mmapFd = open(this->filename.c_str(), O_RDWR);
++  while (this->mmapFd <= 0)
++  {
++    this->mmapFd = open(this->filename.c_str(), O_RDWR);
++    usleep(1000000); // wait and try again
++  }
++
+   if (this->mmapFd <= 0)
+   {
+     stream << "error opening device file " <<  this->filename.c_str() << " : "
+Index: libgazebo/gazebo.h
+===================================================================
+--- libgazebo/gazebo.h	(revision 7143)
++++ libgazebo/gazebo.h	(working copy)
+@@ -556,7 +556,7 @@
+ 
+ 
+ /// Maximum image pixels (width x height)
+-#define GAZEBO_CAMERA_MAX_IMAGE_SIZE 640 * 480 * 3
++#define GAZEBO_CAMERA_MAX_IMAGE_SIZE 1024 * 1024 * 3
+ 
+ /// \brief Camera interface data
+ class CameraData
+@@ -852,6 +852,10 @@
+ 
+   /// Commaned range count
+   public: int cmd_range_count;
++
++  /// Is laser stream opened?
++  public: bool opened;
++  
+ };
+ 
+ /// \brief Laser interface
+@@ -870,6 +874,7 @@
+           {
+             Iface::Create(server,id); 
+             this->data = (LaserData*)this->mMap; 
++            this->data->opened=false;
+           }
+ 
+   /// \brief Open an existing interface
+@@ -879,8 +884,16 @@
+           {
+             Iface::Open(client,id); 
+             this->data = (LaserData*)this->mMap; 
++            this->data->opened=true;
+           }
+ 
++  /// \brief Close an existing interface
++  public: virtual void Close()
++          {
++            Iface::Close();
++            this->data->opened=false;
++          }
++
+   /// Pointer to the laser data
+   public: LaserData *data;
+ };
+@@ -979,7 +992,7 @@
+   public: GazeboData head;
+ 
+   /// String describing the model to be initiated
+-  public: uint8_t newModel[4096];
++  public: uint8_t newModel[409600];
+ 
+   /// Delete a model by name
+   public: uint8_t deleteModel[512];
+@@ -1244,6 +1257,9 @@
+   /// position / speed comand
+   public: unsigned int joint_mode[GAZEBO_ACTARRAY_MAX_NUM_ACTUATORS];
+   
++  /// Is camera stream opened?
++  public: bool opened;
++  
+ };
+ 
+ /// \brief The Actarray interface
+@@ -1281,6 +1297,8 @@
+ /// \} */
+ 
+ 
++
++
+ /***************************************************************************/
+ /// \addtogroup libgazebo_iface
+ /// \{
+@@ -1361,7 +1379,7 @@
+ \{
+ */
+ 
+-#define GAZEBO_STEREO_CAMERA_MAX_RGB_SIZE 640 * 480 * 3
++#define GAZEBO_STEREO_CAMERA_MAX_RGB_SIZE 640 * 480 * 9
+ #define GAZEBO_STEREO_CAMERA_MAX_DISPARITY_SIZE 640 * 480
+ 
+ /// \brief Stereo data
+@@ -1401,6 +1419,10 @@
+ 
+   public: char left_camera_iface_name[256];
+   public: char right_camera_iface_name[256];
++
++  /// Is stereo camera stream opened?
++  public: bool opened;
++  
+ }; 
+ 
+ 
+@@ -1418,6 +1440,7 @@
+           {
+             Iface::Create(server,id); 
+             this->data = (StereoCameraData*)this->mMap; 
++            this->data->opened=false;
+           }
+ 
+   /// \brief Open the iface 
+@@ -1425,8 +1448,16 @@
+           {
+             Iface::Open(client,id); 
+             this->data = (StereoCameraData*)this->mMap; 
++            this->data->opened=true;
+           }
+ 
++  /// \brief Close the iface 
++  public: virtual void Close()
++          {
++            Iface::Close();
++            this->data->opened=false;
++          }
++
+   /// Pointer to the stereo data
+   public: StereoCameraData *data;
+ };
+Index: server/physics/SphereGeom.cc
+===================================================================
+--- server/physics/SphereGeom.cc	(revision 7143)
++++ server/physics/SphereGeom.cc	(working copy)
+@@ -66,11 +66,18 @@
+   this->radiusP->SetValue( radius );
+ 
+   // Initialize box mass matrix
+-  dMassSetSphereTotal(&this->mass, this->massP->GetValue(), 
+-                      this->radiusP->GetValue());
++  this->SetGeom( dCreateSphere(0, this->radiusP->GetValue()), true);
+ 
+   // Create the sphere geometry
+-  this->SetGeom( dCreateSphere(0, this->radiusP->GetValue()), true);
++  if (this->customMassMatrix)
++    dMassSetParameters(&this->mass, this->massP->GetValue(),
++           this->cx, this->cy, this->cz,
++           this->ixx,this->iyy,this->izz,
++           this->ixy,this->ixz,this->iyz);
++  else
++    dMassSetSphereTotal(&this->mass, this->massP->GetValue(), this->radiusP->GetValue());
++
++  
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+Index: server/physics/BoxGeom.cc
+===================================================================
+--- server/physics/BoxGeom.cc	(revision 7143)
++++ server/physics/BoxGeom.cc	(working copy)
+@@ -66,9 +66,18 @@
+   this->sizeP->SetValue( size );
+ 
+   // Initialize box mass matrix
+-  dMassSetBoxTotal(&this->mass, this->massP->GetValue(), 
+-      this->sizeP->GetValue().x, this->sizeP->GetValue().y, 
+-      this->sizeP->GetValue().z);
++  // set mass matrix if user provides some info
++  // pending a tag <massMatrix>true</massMatrix> in geom:
++  if (this->customMassMatrix)
++    dMassSetParameters(&this->mass, this->massP->GetValue(),
++           this->cx, this->cy, this->cz,
++           this->ixx,this->iyy,this->izz,
++           this->ixy,this->ixz,this->iyz);
++  else
++    // Initialize box mass matrix
++    dMassSetBoxTotal(&this->mass, this->massP->GetValue(), 
++        this->sizeP->GetValue().x, this->sizeP->GetValue().y, 
++        this->sizeP->GetValue().z);
+ 
+ 
+   // Create a box geometry with box mass matrix
+Index: server/physics/Geom.hh
+===================================================================
+--- server/physics/Geom.hh	(revision 7143)
++++ server/physics/Geom.hh	(working copy)
+@@ -188,6 +188,20 @@
+     ///  Mass as a double
+     protected: ParamT<double> *massP;
+ 
++    ///  User specified Mass Matrix
++    protected: ParamT<bool> *customMassMatrixP;
++    protected: ParamT<double> *cxP ;
++    protected: ParamT<double> *cyP ;
++    protected: ParamT<double> *czP ;
++    protected: ParamT<double> *ixxP;
++    protected: ParamT<double> *iyyP;
++    protected: ParamT<double> *izzP;
++    protected: ParamT<double> *ixyP;
++    protected: ParamT<double> *ixzP;
++    protected: ParamT<double> *iyzP;
++    protected: bool customMassMatrix;
++    protected: double cx,cy,cz,ixx,iyy,izz,ixy,ixz,iyz;
++
+     private: ParamT<Vector3> *xyzP;
+     private: ParamT<Quatern> *rpyP;
+ 
+Index: server/physics/Body.hh
+===================================================================
+--- server/physics/Body.hh	(revision 7143)
++++ server/physics/Body.hh	(working copy)
+@@ -101,6 +101,18 @@
+     /// \return Rotation quaternion
+     public: Quatern GetRotation() const;
+   
++    /// \brief Return the velocity of the body
++    /// \return Velocity vector
++    public: Vector3 GetPositionRate() const;
++
++    /// \brief Return the rotation rates
++    /// \return Rotation Rate quaternion
++    public: Quatern GetRotationRate() const;
++
++    /// \brief Return the rotation rates
++    /// \return Rotation Rate Euler Angles RPY
++    public: Vector3 GetEulerRate() const;
++
+     /// \brief Return the ID of this body
+     /// \return ODE body id
+     public: dBodyID GetId() const;
+@@ -184,6 +196,7 @@
+   
+     private: ParamT<Vector3> *xyzP;
+     private: ParamT<Quatern> *rpyP;
++    private: ParamT<bool> *turnGravityOffP;
+   };
+   
+   /// \}
+Index: server/physics/CylinderGeom.cc
+===================================================================
+--- server/physics/CylinderGeom.cc	(revision 7143)
++++ server/physics/CylinderGeom.cc	(working copy)
+@@ -64,11 +64,21 @@
+   this->sizeP->SetValue( size );
+ 
+   // Initialize mass matrix
+-  dMassSetCylinderTotal(&this->mass, this->massP->GetValue(), 3, 
+-      this->sizeP->GetValue().x, this->sizeP->GetValue().y);
++  // pending a tag <massMatrix>true</massMatrix> in geom:
++  if (this->customMassMatrix)
++    dMassSetParameters(&this->mass, this->massP->GetValue(),
++           this->cx, this->cy, this->cz,
++           this->ixx,this->iyy,this->izz,
++           this->ixy,this->ixz,this->iyz);
++  else
++    // Initialize mass matrix
++    dMassSetCylinderTotal(&this->mass, this->massP->GetValue(), 3, 
++        this->sizeP->GetValue().x, this->sizeP->GetValue().y);
+ 
+   this->SetGeom( dCreateCylinder( 0, this->sizeP->GetValue().x, 
+         this->sizeP->GetValue().y ), true );
++
++
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////
+Index: server/physics/MapGeom.cc
+===================================================================
+--- server/physics/MapGeom.cc	(revision 7143)
++++ server/physics/MapGeom.cc	(working copy)
+@@ -307,7 +307,9 @@
+ 
+   int diff = labs(freePixels - occPixels);
+ 
+-  if (diff > this->granularityP->GetValue())
++  //if (diff > this->granularityP->GetValue())
++  // use pixel size for granularity instead of occupancy
++  if (node->width*node->height > this->granularityP->GetValue())
+   {
+     float newX, newY;
+     float newW, newH;
+@@ -353,7 +355,7 @@
+         newY += ceil(newH);
+     }
+ 
+-    node->occupied = true;
++    node->occupied = false;
+     node->leaf = false;
+   }
+   else if (occPixels == 0)
+Index: server/physics/Geom.cc
+===================================================================
+--- server/physics/Geom.cc	(revision 7143)
++++ server/physics/Geom.cc	(working copy)
+@@ -73,6 +73,17 @@
+ 
+   this->laserFiducialIdP = new ParamT<int>("laserFiducialId",-1,0);
+   this->laserRetroP = new ParamT<float>("laserRetro",-1,0);
++
++  this->customMassMatrixP = new ParamT<bool>("massMatrix",false,0);
++  this->cxP = new ParamT<double>("cx",0.0,0);
++  this->cyP = new ParamT<double>("cy",0.0,0);
++  this->czP = new ParamT<double>("cz",0.0,0);
++  this->ixxP = new ParamT<double>("ixx",1e-6,0);
++  this->iyyP = new ParamT<double>("iyy",1e-6,0);
++  this->izzP = new ParamT<double>("izz",1e-6,0);
++  this->ixyP = new ParamT<double>("ixy",0.0,0);
++  this->ixzP = new ParamT<double>("ixz",0.0,0);
++  this->iyzP = new ParamT<double>("iyz",0.0,0);
+   Param::End();
+ }
+ 
+@@ -99,6 +110,16 @@
+   delete this->rpyP;
+   delete this->laserFiducialIdP;
+   delete this->laserRetroP;
++  delete this->customMassMatrixP;
++  delete this->cxP ;
++  delete this->cyP ;
++  delete this->czP ;
++  delete this->ixxP;
++  delete this->iyyP;
++  delete this->izzP;
++  delete this->ixyP;
++  delete this->ixzP;
++  delete this->iyzP;
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -123,6 +144,63 @@
+     this->massP->SetValue( 0.001 );
+   }
+ 
++  this->customMassMatrixP->Load(node);
++  this->cxP ->Load(node);
++  this->cyP ->Load(node);
++  this->czP ->Load(node);
++  this->ixxP->Load(node);
++  this->iyyP->Load(node);
++  this->izzP->Load(node);
++  this->ixyP->Load(node);
++  this->ixzP->Load(node);
++  this->iyzP->Load(node);
++
++  // option to enter full maxx matrix
++  this->customMassMatrix = this->customMassMatrixP->GetValue();
++  this->cx  = this->cxP ->GetValue();
++  this->cy  = this->cyP ->GetValue();
++  this->cz  = this->czP ->GetValue();
++  this->ixx = this->ixxP->GetValue();
++  this->iyy = this->iyyP->GetValue();
++  this->izz = this->izzP->GetValue();
++  this->ixy = this->ixyP->GetValue();
++  this->ixz = this->ixzP->GetValue();
++  this->iyz = this->iyzP->GetValue();
++
++  // setup this->mass as well
++  this->mass.c[0] = this->cx;
++  this->mass.c[1] = this->cy;
++  this->mass.c[2] = this->cz;
++
++  this->mass.I[0] = this->ixx;
++  this->mass.I[1] = this->ixy;
++  this->mass.I[2] = this->ixz;
++
++  this->mass.I[3] = this->ixy;
++  this->mass.I[4] = this->iyy;
++  this->mass.I[5] = this->iyz;
++
++  this->mass.I[6] = this->ixz;
++  this->mass.I[7] = this->iyz;
++  this->mass.I[8] = this->izz;
++
++  this->mass.I[9] = 1;
++  this->mass.I[10] = 1;
++  this->mass.I[11] = 1;
++
++  // std::cout << " c[0] " << this->mass.c[0] << std::endl;
++  // std::cout << " c[1] " << this->mass.c[1] << std::endl;
++  // std::cout << " c[2] " << this->mass.c[2] << std::endl;
++  // std::cout << " I[0] " << this->mass.I[0] << std::endl;
++  // std::cout << " I[1] " << this->mass.I[1] << std::endl;
++  // std::cout << " I[2] " << this->mass.I[2] << std::endl;
++  // std::cout << " I[3] " << this->mass.I[3] << std::endl;
++  // std::cout << " I[4] " << this->mass.I[4] << std::endl;
++  // std::cout << " I[5] " << this->mass.I[5] << std::endl;
++  // std::cout << " I[6] " << this->mass.I[6] << std::endl;
++  // std::cout << " I[7] " << this->mass.I[7] << std::endl;
++  // std::cout << " I[8] " << this->mass.I[8] << std::endl;
++
+   this->contact->Load(node);
+ 
+   this->LoadChild(node);
+@@ -396,23 +474,24 @@
+   Pose3d pose;
+   dQuaternion q;
+   dMatrix3 r;
+-  dMass bodyMass;
+ 
+   if (!this->placeable)
+     return NULL;
+ 
+-  pose = this->GetPose();
++  pose = this->GetPose(); // get pose of the geometry
+ 
+   q[0] = pose.rot.u;
+   q[1] = pose.rot.x;
+   q[2] = pose.rot.y;
+   q[3] = pose.rot.z;
+ 
+-  dQtoR(q,r);
++  dQtoR(q,r); // turn quaternion into rotation matrix
+ 
+-
++  // this->mass was init to zero at start,
++  // read user specified mass into this->dblMass and dMassAdd in this->mass
+   this->bodyMass = this->mass;
+ 
++
+   if (dMassCheck(&this->bodyMass))
+   {
+     dMassRotate(&this->bodyMass, r);
+Index: server/physics/Body.cc
+===================================================================
+--- server/physics/Body.cc	(revision 7143)
++++ server/physics/Body.cc	(working copy)
+@@ -45,6 +45,10 @@
+ #include "Geom.hh"
+ #include "Body.hh"
+ 
++#ifdef TIMING
++#include "Simulator.hh"// for timing
++#endif
++
+ using namespace gazebo;
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -70,6 +74,7 @@
+ 
+   this->rpyP = new ParamT<Quatern>("rpy", Quatern(), 0);
+   this->rpyP->Callback( &Body::SetRotation, this );
++  this->turnGravityOffP = new ParamT<bool>("turnGravityOff", false, 0);
+   Param::End();
+ }
+ 
+@@ -107,6 +112,7 @@
+   this->nameP->Load(node);
+   this->xyzP->Load(node);
+   this->rpyP->Load(node);
++  this->turnGravityOffP->Load(node);
+   Pose3d initPose;
+ 
+   initPose.pos = **(this->xyzP);
+@@ -134,8 +140,9 @@
+   }
+ 
+   // If no geoms are attached, then don't let gravity affect the body.
+-  if (this->geoms.size()==0)
++  if (this->turnGravityOffP->GetValue() || this->geoms.size()==0)
+   {
++    std::cout << "setting gravity to zero for: " << this->nameP->GetValue() << std::endl;
+     this->SetGravityMode(false);
+   }
+ 
+@@ -218,25 +225,51 @@
+   std::vector< Sensor* >::iterator sensorIter;
+   std::map< std::string, Geom* >::iterator geomIter;
+ 
++#ifdef TIMING
++  double tmpT1 = Simulator::Instance()->GetWallTime();
++#endif
++
+   this->UpdatePose();
+ 
++#ifdef TIMING
++  double tmpT2 = Simulator::Instance()->GetWallTime();
++  std::cout << "           body Name (" << this->nameP->GetValue() << ")" << std::endl;
++  std::cout << "           UpdatePose dt (" << tmpT2-tmpT1 << ")" << std::endl;
++#endif
++
+   if (!this->IsStatic())
+   {
+     // Set the pose of the scene node
+     this->visualNode->SetPose(this->pose);
+   }
+ 
++#ifdef TIMING
++  double tmpT3 = Simulator::Instance()->GetWallTime();
++  std::cout << "           Static SetPose dt (" << tmpT3-tmpT2 << ")" << std::endl;
++#endif
++
+   for (geomIter=this->geoms.begin();
+        geomIter!=this->geoms.end(); geomIter++)
+   {
+     geomIter->second->Update();
+   }
+ 
++#ifdef TIMING
++  double tmpT4 = Simulator::Instance()->GetWallTime();
++  std::cout << "           Geom Update dt (" << tmpT4-tmpT3 << ")" << std::endl;
++#endif
++
+   for (sensorIter=this->sensors.begin();
+        sensorIter!=this->sensors.end(); sensorIter++)
+   {
+     (*sensorIter)->Update();
+   }
++
++#ifdef TIMING
++  double tmpT5 = Simulator::Instance()->GetWallTime();
++  std::cout << "           sensors Update dt (" << tmpT5-tmpT4 << ")" << std::endl;
++#endif
++
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -404,6 +437,88 @@
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
++// Return the position of the body. in global CS
++Vector3 Body::GetPositionRate() const
++{
++  Vector3 vel;
++
++  if (this->bodyId)
++  {
++    const dReal *v;
++
++    v = dBodyGetLinearVel(this->bodyId);
++
++    vel.x = v[0];
++    vel.y = v[1];
++    vel.z = v[2];
++  }
++  else
++  {
++    vel.x = 0;
++    vel.y = 0;
++    vel.z = 0;
++  }
++
++  return vel;
++}
++
++
++////////////////////////////////////////////////////////////////////////////////
++// Return the rotation
++Quatern Body::GetRotationRate() const
++{
++  Quatern velQ;
++  Vector3 vel;
++
++  if (this->bodyId)
++  {
++    const dReal *v;
++
++    v = dBodyGetAngularVel(this->bodyId);
++    vel.x = v[0];
++    vel.y = v[1];
++    vel.z = v[2];
++
++    velQ.SetFromEuler(vel);
++  }
++  else
++  {
++    vel.x = 0;
++    vel.y = 0;
++    vel.z = 0;
++    velQ.SetFromEuler(vel);
++  }
++
++  return velQ;
++}
++
++////////////////////////////////////////////////////////////////////////////////
++// Return the rotation
++Vector3 Body::GetEulerRate() const
++{
++  Vector3 vel;
++
++  if (this->bodyId)
++  {
++    const dReal *v;
++
++    v = dBodyGetAngularVel(this->bodyId);
++    vel.x = v[0];
++    vel.y = v[1];
++    vel.z = v[2];
++
++  }
++  else
++  {
++    vel.x = 0;
++    vel.y = 0;
++    vel.z = 0;
++  }
++
++  return vel;
++}
++
++////////////////////////////////////////////////////////////////////////////////
+ // Return the ID of this body
+ dBodyID Body::GetId() const
+ {
+@@ -506,7 +621,6 @@
+ void Body::UpdateCoM()
+ {
+   const dMass *lmass;
+-  Pose3d oldPose, newPose, pose;
+   std::map< std::string, Geom* >::iterator giter;
+ 
+   if (!this->bodyId)
+@@ -524,7 +638,13 @@
+     }
+   }
+ 
++  //return; // Stop pose update, we have full com xyz, I control
++
+   // Old pose for the CoM
++  Pose3d oldPose, newPose, tmpPose;
++
++  // oldPose is the last comPose
++  // newPose is mass CoM
+   oldPose = this->comPose;
+ 
+   if (std::isnan(this->mass.c[0]))
+@@ -546,19 +666,25 @@
+   {
+     if (giter->second->IsPlaceable())
+     {
++      // FOR GEOMS:
++      // get pose with comPose set to oldPose
+       this->comPose = oldPose;
+-      pose = giter->second->GetPose();
++      tmpPose = giter->second->GetPose();
++
++      // get pose with comPose set to newPose
+       this->comPose = newPose;
+-      giter->second->SetPose(pose, false);
++      giter->second->SetPose(tmpPose, false);
+     }
+   }
+ 
+ 
+-  // Fixup the pose of the CoM (ODE body)
++  // FOR BODY: Fixup the pose of the CoM (ODE body)
++  // get pose with comPose set to oldPose
+   this->comPose = oldPose;
+-  pose = this->GetPose();
++  tmpPose = this->GetPose();
++  // get pose with comPose set to newPose
+   this->comPose = newPose;
+-  this->SetPose(pose);
++  this->SetPose(tmpPose);
+ 
+ 
+   // Settle on the new CoM pose
+Index: server/physics/Joint.hh
+===================================================================
+--- server/physics/Joint.hh	(revision 7143)
++++ server/physics/Joint.hh	(working copy)
+@@ -163,6 +163,21 @@
+     private: ParamT<bool> *provideFeedbackP;
+     private: ParamT<double> *fudgeFactorP;
+ 
++    /// Added for mimicing other joints
++    private: ParamT<std::string> *mimicJointP;
++    private: ParamT<double> *mimicMultP;
++    private: ParamT<double> *mimicOffsetP;
++    private: ParamT<double> *mimicKpP;
++    private: ParamT<double> *mimicKdP;
++    private: ParamT<double> *mimicFMaxP;
++    private: Joint *mimicJoint;
++    private: bool enableMimic;
++    private: double mimicMult;
++    private: double mimicOffset;
++    private: double mimicKp;
++    private: double mimicKd;
++    private: double mimicFMax;
++
+     /// Feedback data for this joint
+     private: dJointFeedback *feedback;
+ 
+Index: server/physics/ode/ODEPhysics.hh
+===================================================================
+--- server/physics/ode/ODEPhysics.hh	(revision 7143)
++++ server/physics/ode/ODEPhysics.hh	(working copy)
+@@ -133,6 +133,9 @@
+ 
+   private: ParamT<double> *globalCFMP; 
+   private: ParamT<double> *globalERPP; 
++  private: ParamT<bool> *quickStepP; 
++  private: ParamT<int> *quickStepItersP; 
++  private: ParamT<double> *quickStepWP; 
+ };
+ 
+ /** \}*/
+Index: server/physics/ode/ODEPhysics.cc
+===================================================================
+--- server/physics/ode/ODEPhysics.cc	(revision 7143)
++++ server/physics/ode/ODEPhysics.cc	(working copy)
+@@ -44,6 +44,10 @@
+ #include "XMLConfig.hh"
+ #include "ODEPhysics.hh"
+ 
++#ifdef TIMING
++#include "Simulator.hh"// for timing
++#endif
++
+ using namespace gazebo;
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -70,6 +74,9 @@
+   Param::Begin(&this->parameters);
+   this->globalCFMP = new ParamT<double>("cfm", 10e-5, 0);
+   this->globalERPP = new ParamT<double>("erp", 0.2, 0);
++  this->quickStepP = new ParamT<bool>("quickStep", false, 0);
++  this->quickStepItersP = new ParamT<int>("quickStepIters", 20, 0);
++  this->quickStepWP = new ParamT<double>("quickStepW", 1.3, 0);  /// over_relaxation value for SOR
+   Param::End();
+ }
+ 
+@@ -88,6 +95,7 @@
+ 
+   delete this->globalCFMP;
+   delete this->globalERPP;
++  delete this->quickStepP;
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -103,6 +111,9 @@
+   this->updateRateP->Load(cnode);
+   this->globalCFMP->Load(cnode);
+   this->globalERPP->Load(cnode);
++  this->quickStepP->Load(cnode);
++  this->quickStepItersP->Load(cnode);
++  this->quickStepWP->Load(cnode);
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -115,6 +126,7 @@
+   stream << prefix << "  " << *(this->updateRateP) << "\n";
+   stream << prefix << "  " << *(this->globalCFMP) << "\n";
+   stream << prefix << "  " << *(this->globalERPP) << "\n";
++  stream << prefix << "  " << *(this->quickStepP) << "\n";
+   stream << prefix << "</physics:ode>\n";
+ }
+ 
+@@ -126,20 +138,37 @@
+   dWorldSetGravity(this->worldId, g.x, g.y, g.z);
+   dWorldSetCFM(this->worldId, this->globalCFMP->GetValue());
+   dWorldSetERP(this->worldId, this->globalERPP->GetValue());
+-
++  dWorldSetQuickStepNumIterations(this->worldId, this->quickStepItersP->GetValue() );
++  dWorldSetQuickStepW(this->worldId, this->quickStepWP->GetValue() );
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+ // Update the ODE engine
+ void ODEPhysics::Update()
+ {
++#ifdef TIMING
++  double tmpT1 = Simulator::Instance()->GetWallTime();
++#endif
++  
+   // Do collision detection; this will add contacts to the contact group
+   dSpaceCollide( this->spaceId, this, CollisionCallback );
+ 
++#ifdef TIMING
++  double tmpT2 = Simulator::Instance()->GetWallTime();
++  std::cout << "    collision dt (" << tmpT2-tmpT1 << ")" << std::endl;
++#endif
++
+   // Update the dynamical model
+-  dWorldStep( this->worldId, this->stepTimeP->GetValue() );
+-  //dWorldQuickStep(this->worldId, this->stepTime);
++  if (this->quickStepP->GetValue())
++    dWorldQuickStep(this->worldId, this->stepTimeP->GetValue() );
++  else
++    dWorldStep( this->worldId, this->stepTimeP->GetValue() );
+ 
++#ifdef TIMING
++  double tmpT3 = Simulator::Instance()->GetWallTime();
++  std::cout << "    ode step dt (" << tmpT3-tmpT2 << ")" << std::endl;
++#endif
++
+   // Very important to clear out the contact group
+   dJointGroupEmpty( this->contactGroup );
+ 
+@@ -266,15 +295,16 @@
+         contact.surface.mode = dContactSlip1 | dContactSlip2 | 
+                                dContactSoftERP | dContactSoftCFM |  
+                                dContactBounce | dContactMu2 | dContactApprox1;
++        contact.surface.mode = 0;
+ 
+ 
+         // Compute the CFM and ERP by assuming the two bodies form a
+         // spring-damper system.
+         h = self->stepTimeP->GetValue();
+-        kp = 1 / (1 / geom1->contact->kp + 1 / geom2->contact->kp);
++        kp = 1.0 / (1.0 / geom1->contact->kp + 1.0 / geom2->contact->kp);
+         kd = geom1->contact->kd + geom2->contact->kd;
+         contact.surface.soft_erp = h * kp / (h * kp + kd);
+-        contact.surface.soft_cfm = 1 / (h * kp + kd);
++        contact.surface.soft_cfm = 1.0 / (h * kp + kd);
+ 
+         contact.surface.mu = MIN(geom1->contact->mu1, geom2->contact->mu1);
+         contact.surface.mu2 = MIN(geom1->contact->mu2, geom2->contact->mu2);
+Index: server/physics/Joint.cc
+===================================================================
+--- server/physics/Joint.cc	(revision 7143)
++++ server/physics/Joint.cc	(working copy)
+@@ -30,6 +30,7 @@
+ #include "Model.hh"
+ #include "World.hh"
+ #include "Joint.hh"
++#include "HingeJoint.hh"
+ 
+ using namespace gazebo;
+ 
+@@ -41,6 +42,9 @@
+   this->visual = NULL;
+   this->model = NULL;
+ 
++  this->enableMimic = false;
++  this->mimicJoint = NULL;
++
+   Param::Begin(&this->parameters);
+   this->erpP = new ParamT<double>("erp",0.4,0);
+   this->cfmP = new ParamT<double>("cfm",10e-3,0);
+@@ -50,6 +54,13 @@
+   this->anchorOffsetP = new ParamT<Vector3>("anchorOffset",Vector3(0,0,0), 0);
+   this->provideFeedbackP = new ParamT<bool>("provideFeedback", false, 0);
+   this->fudgeFactorP = new ParamT<double>( "fudgeFactor", 1.0, 0 );
++
++  this->mimicJointP = new ParamT<std::string>("mimicJoint", std::string(), 0);
++  this->mimicMultP = new ParamT<double>("mimicMult", 1.0, 0);
++  this->mimicOffsetP = new ParamT<double>("mimicOffset", 0.0, 0);
++  this->mimicKpP = new ParamT<double>("mimicKp", 10.0, 0);
++  this->mimicKdP = new ParamT<double>("mimicKd", 0.0, 0);
++  this->mimicFMaxP = new ParamT<double>("mimicFMax", 1000.0, 0);
+   Param::End();
+ }
+ 
+@@ -67,6 +78,12 @@
+   delete this->anchorOffsetP;
+   delete this->provideFeedbackP;
+   delete this->fudgeFactorP;
++  delete this->mimicJointP;
++  delete this->mimicMultP;
++  delete this->mimicOffsetP;
++  delete this->mimicKpP;
++  delete this->mimicKdP;
++  delete this->mimicFMaxP;
+ }
+ 
+ 
+@@ -92,6 +109,12 @@
+   this->cfmP->Load(node);
+   this->provideFeedbackP->Load(node);
+   this->fudgeFactorP->Load(node);
++  this->mimicJointP->Load(node);
++  this->mimicMultP->Load(node);
++  this->mimicOffsetP->Load(node);
++  this->mimicKpP->Load(node);
++  this->mimicKdP->Load(node);
++  this->mimicFMaxP->Load(node);
+ 
+   Body *body1 = this->model->GetBody( **(this->body1NameP));
+   Body *body2 = this->model->GetBody(**(this->body2NameP));
+@@ -147,6 +170,22 @@
+   {
+     this->SetAnchor(anchorVec);
+   }
++
++  // Check mimic option
++  this->mimicJoint = this->model->GetJoint( **(this->mimicJointP));
++  if (this->mimicJoint != NULL && this->mimicJoint != this)
++  {
++    // enforce constraint
++    this->enableMimic = true;
++    this->mimicMult   = this->mimicMultP->GetValue();
++    this->mimicOffset = this->mimicOffsetP->GetValue();
++    this->mimicKp     = this->mimicKpP->GetValue();
++    this->mimicKd     = this->mimicKdP->GetValue();
++    this->mimicFMax   = this->mimicFMaxP->GetValue();
++    std::cout << this->nameP->GetValue() << " this joint will mimic joint " << this->mimicJointP->GetValue() << std::endl;
++    if (this->type == Joint::HINGE)
++      this->SetParam(dParamFMax, this->mimicFMax);
++  }
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -184,6 +223,17 @@
+ /// Update the joint
+ void Joint::Update()
+ {
++  // enforce mimic
++  // only enforce constraint for same type hinge joints
++  if (this->enableMimic           == true         &&
++      this->mimicJoint->GetType() == Joint::HINGE &&
++      this->type                  == Joint::HINGE )
++  {
++    double error = (this->mimicMult*(((HingeJoint*)(this->mimicJoint))->GetAngle()) - this->mimicOffset - ((HingeJoint*)this)->GetAngle());
++    //std::cout << this->nameP->GetValue() << " error " << error << " " << this->mimicOffset << " " << this->mimicMult << std::endl;
++    this->SetParam(dParamVel, this->mimicKp*error);
++  }
++
+ //TODO: Evaluate impact of this code on performance
+   this->visual->SetVisible(World::Instance()->GetShowJoints());
+ 
+@@ -206,6 +256,7 @@
+     this->line2->SetPoint(0, start);
+     this->line2->Update();
+   }
++
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////
+Index: server/physics/TrimeshGeom.cc
+===================================================================
+--- server/physics/TrimeshGeom.cc	(revision 7143)
++++ server/physics/TrimeshGeom.cc	(working copy)
+@@ -208,7 +208,13 @@
+ 
+   this->geomId = dCreateTriMesh( this->spaceId, this->odeData,0,0,0 );
+ 
+-  dMassSetTrimesh(&this->mass, this->massP->GetValue(), this->geomId);
++  if (this->customMassMatrix)
++    dMassSetParameters(&this->mass, this->massP->GetValue(),
++         this->cx, this->cy, this->cz,
++         this->ixx,this->iyy,this->izz,
++         this->ixy,this->ixz,this->iyz);
++  else
++    dMassSetTrimesh(&this->mass, this->massP->GetValue(), this->geomId);
+ 
+   // Create the trimesh geometry
+   this->SetGeom(this->geomId, true);
+Index: server/sensors/Sensor.hh
+===================================================================
+--- server/sensors/Sensor.hh	(revision 7143)
++++ server/sensors/Sensor.hh	(working copy)
+@@ -70,6 +70,7 @@
+ 
+     /// \brief Set whether the sensor is active or not
+     public: void SetActive(bool value);
++    public: bool IsActive();
+ 
+     /// \brief  Load the child sensor
+     protected: virtual void LoadChild(XMLConfigNode * /*node*/) {};
+@@ -101,7 +102,6 @@
+     protected: double lastUpdate;
+     protected: std::string typeName;
+   };
+-  
+   /// \}
+ }
+ #endif
+Index: server/sensors/ray/RaySensor.hh
+===================================================================
+--- server/sensors/ray/RaySensor.hh	(revision 7143)
++++ server/sensors/ray/RaySensor.hh	(working copy)
+@@ -100,6 +100,22 @@
+   /// \return The number of ranges
+   public: int GetRangeCount() const;
+ 
++  /// \brief Get the vertical scan line count
++  /// \return The number of scan lines vertically
++  public: int GetVerticalRayCount() const;
++
++  /// \brief Get the vertical scan line count
++  /// \return The number of scan lines vertically
++  public: int GetVerticalRangeCount() const;
++
++  /// \brief Get the vertical scan bottom angle
++  /// \return The minimum angle of the scan block
++  public: Angle GetVerticalMinAngle() const;
++
++  /// \brief Get the vertical scan line top angle
++  /// \return The Maximum angle of the scan block
++  public: Angle GetVerticalMaxAngle() const;
++
+   /// \brief Set ray parameters
+   /// \param index Rayindex (from 0 to rayCount - 1).
+   /// \param a, b Ray endpoints (initial and final points).  These are
+@@ -142,6 +158,11 @@
+   /// Display rays when rendering images
+   private: ParamT<bool> *displayRaysP;
+ 
++  // For ray blocks such as Velodyne
++  private: ParamT<int> *verticalRayCountP;
++  private: ParamT<int> *verticalRangeCountP;
++  private: ParamT<Angle> *verticalMinAngleP;
++  private: ParamT<Angle> *verticalMaxAngleP;
+ };
+ /// \}
+ /// \}
+Index: server/sensors/ray/RaySensor.cc
+===================================================================
+--- server/sensors/ray/RaySensor.cc	(revision 7143)
++++ server/sensors/ray/RaySensor.cc	(working copy)
+@@ -64,6 +64,12 @@
+   this->maxRangeP = new ParamT<double>("maxRange",0,1);
+   this->originP = new ParamT<Vector3>("origin", Vector3(0,0,0), 0);
+   this->displayRaysP = new ParamT<bool>("displayRays", true, 0);
++
++  // for block rays, vertical setting
++  this->verticalRayCountP = new ParamT<int>("verticalRayCount", 1, 0);
++  this->verticalRangeCountP = new ParamT<int>("verticalRangeCount", 1, 0);
++  this->verticalMinAngleP = new ParamT<Angle>("verticalMinAngle", DTOR(0), 0);
++  this->verticalMaxAngleP = new ParamT<Angle>("verticalMaxAngle", DTOR(0), 0);
+   Param::End();
+ }
+ 
+@@ -80,6 +86,11 @@
+   delete this->maxRangeP;
+   delete this->originP;
+   delete this->displayRaysP;
++
++  delete this->verticalRayCountP;
++  delete this->verticalRangeCountP;
++  delete this->verticalMinAngleP;
++  delete this->verticalMaxAngleP;
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////
+@@ -99,6 +110,10 @@
+   this->maxRangeP->Load(node);
+   this->originP->Load(node);
+   this->displayRaysP->Load(node);
++  this->verticalRayCountP->Load(node);
++  this->verticalRangeCountP->Load(node);
++  this->verticalMinAngleP->Load(node);
++  this->verticalMaxAngleP->Load(node);
+ 
+ 
+   // Create a space to contain the ray space
+@@ -128,6 +143,10 @@
+   stream << prefix << "  " << *(this->rayCountP) << "\n";
+   stream << prefix << "  " << *(this->rangeCountP) << "\n";
+   stream << prefix << "  " << *(this->displayRaysP) << "\n";
++  stream << prefix << "  " << *(this->verticalRayCountP) << "\n";
++  stream << prefix << "  " << *(this->verticalRangeCountP) << "\n";
++  stream << prefix << "  " << *(this->verticalMinAngleP) << "\n";
++  stream << prefix << "  " << *(this->verticalMaxAngleP) << "\n";
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////
+@@ -135,35 +154,42 @@
+ void RaySensor::InitChild()
+ {
+   Pose3d bodyPose;
+-  double angle;
++  double yawAngle, pitchAngle;
+   Vector3 start, end, axis;
+   RayGeom *ray;
+ 
+   bodyPose = this->body->GetPose();
+   this->prevPose = bodyPose;
+ 
++  double pDiff = (**(this->verticalMaxAngleP) - **(this->verticalMinAngleP)).GetAsRadian();
++  double yDiff = (**(this->maxAngleP) - **(this->minAngleP)).GetAsRadian();
+   // Create and array of ray geoms
+-  for (int i = 0; i < this->rayCountP->GetValue(); i++)
+-  //for (int i = this->rayCount-1; i >= 0; i--)
++  for (int j = 0; j < this->verticalRayCountP->GetValue(); j++)
+   {
+-    double diff = (**(this->maxAngleP) - **(this->minAngleP)).GetAsRadian();
+ 
+-    angle = i * diff / (rayCountP->GetValue() - 1) + (**(this->minAngleP)).GetAsRadian();
++    for (int i = 0; i < this->rayCountP->GetValue(); i++)
++    //for (int i = this->rayCount-1; i >= 0; i--)
++    {
+ 
+-    axis.Set(cos(angle), sin(angle),0);
++      yawAngle = (rayCountP->GetValue() == 1)? 0 : i * yDiff / (rayCountP->GetValue() - 1) + (**(this->minAngleP)).GetAsRadian();
+ 
+-    start = (axis * this->minRangeP->GetValue()) + this->originP->GetValue();
+-    end = (axis * this->maxRangeP->GetValue()) + this->originP->GetValue();
++      pitchAngle = (verticalRayCountP->GetValue() == 1)? 0 :  j * pDiff / (verticalRayCountP->GetValue() - 1) + (**(this->verticalMinAngleP)).GetAsRadian();
+ 
+-    ray = new RayGeom(this->body, displayRaysP->GetValue());
++      axis.Set(cos(pitchAngle)*cos(yawAngle), sin(yawAngle),sin(pitchAngle)*cos(yawAngle));
+ 
+-    ray->SetPoints(start, end);
+-//    ray->SetCategoryBits( GZ_LASER_COLLIDE );
+-    //ray->SetCollideBits( ~GZ_LASER_COLLIDE );
++      start = (axis * this->minRangeP->GetValue()) + this->originP->GetValue();
++      end = (axis * this->maxRangeP->GetValue()) + this->originP->GetValue();
+ 
+-    this->rays.push_back(ray);
++      ray = new RayGeom(this->body, displayRaysP->GetValue());
+ 
+-    //this->body->AttachGeom(ray);
++      ray->SetPoints(start, end);
++      //ray->SetCategoryBits( GZ_LASER_COLLIDE );
++      //ray->SetCollideBits( ~GZ_LASER_COLLIDE );
++
++      this->rays.push_back(ray);
++
++      //this->body->AttachGeom(ray);
++    }
+   }
+ 
+ }
+@@ -223,6 +249,34 @@
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////
++/// Get the vertical scan line count
++int RaySensor::GetVerticalRayCount() const
++{
++  return this->verticalRayCountP->GetValue();
++}
++
++//////////////////////////////////////////////////////////////////////////////
++/// Get the vertical scan line count
++int RaySensor::GetVerticalRangeCount() const
++{
++  return this->verticalRangeCountP->GetValue();
++}
++
++//////////////////////////////////////////////////////////////////////////////
++/// Get the vertical min angle
++Angle RaySensor::GetVerticalMinAngle() const
++{
++  return this->verticalMinAngleP->GetValue();
++}
++
++//////////////////////////////////////////////////////////////////////////////
++/// Get the vertical max angle
++Angle RaySensor::GetVerticalMaxAngle() const
++{
++  return this->verticalMaxAngleP->GetValue();
++}
++
++//////////////////////////////////////////////////////////////////////////////
+ // Get detected range for a ray
+ double RaySensor::GetRange(int index)
+ {
+Index: server/sensors/Sensor.cc
+===================================================================
+--- server/sensors/Sensor.cc	(revision 7143)
++++ server/sensors/Sensor.cc	(working copy)
+@@ -33,6 +33,7 @@
+ #include "ControllerFactory.hh"
+ #include "Simulator.hh"
+ #include "Sensor.hh"
++#include "Simulator.hh"
+ 
+ using namespace gazebo;
+ 
+@@ -71,6 +72,14 @@
+ 
+   this->LoadController( node->GetChildByNSPrefix("controller") );
+   this->LoadChild(node);
++
++  double updateRate  = node->GetDouble("updateRate", 0, 0);
++  if (updateRate == 0)
++    this->updatePeriod = 0.0; // no throttling if updateRate is 0
++  else
++    this->updatePeriod = 1.0 / updateRate;
++  this->lastUpdate   = Simulator::Instance()->GetSimTime();
++
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -185,4 +194,11 @@
+   this->active = value;
+ }
+ 
++////////////////////////////////////////////////////////////////////////////////
++/// \brief Set whether the sensor is active or not
++bool Sensor::IsActive()
++{
++  return this->active;
++}
+ 
++
+Index: server/Global.hh
+===================================================================
+--- server/Global.hh	(revision 7143)
++++ server/Global.hh	(working copy)
+@@ -88,4 +88,7 @@
+ 
+ #define GZ_DELETE(p) { if(p) { delete (p);  (p)=NULL; } }
+ 
++// Timing Debug
++//#define TIMING
++
+ #endif
+Index: server/Simulator.cc
+===================================================================
+--- server/Simulator.cc	(revision 7143)
++++ server/Simulator.cc	(working copy)
+@@ -74,6 +74,7 @@
+   timeout(-1),
+   selectedEntity(NULL)
+ {
++  selectedEntity = NULL;
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -295,6 +296,11 @@
+   {
+     currTime = this->GetRealTime();
+ 
++#ifdef TIMING
++    double tmpT1 = this->GetWallTime();
++    std::cout << "CURRENT simTime(" << this->simTime << ") current world time (" << tmpT1 << ")" << std::endl;
++#endif
++
+     if (physicsUpdateRate == 0 || 
+         currTime - this->prevPhysicsTime >= physicsUpdatePeriod) 
+     {
+@@ -319,18 +325,27 @@
+       World::Instance()->Update();
+     }
+ 
+-    // Update the rendering
++#ifdef TIMING
++    double tmpT2 = this->GetWallTime();
++    std::cout << " World::Instance() TOTAL DT(" << tmpT2-tmpT1 << ")" << std::endl;
++#endif
++
++    // Update the gui
+     if (renderUpdateRate == 0 || 
+         currTime - this->prevRenderTime >= renderUpdatePeriod)
+     {
+-      //this->GetRenderEngine()->Render(); 
+-      //this->prevRenderTime = this->GetRealTime();
+-    }
+ 
+-    // Update the gui
+-    if (this->gui)
+-    {
+-      this->gui->Update();
++      // Update the gui
++      if (this->gui)
++      {
++        this->gui->Update();
++#ifdef TIMING
++      double tmpT3 = this->GetWallTime();
++      std::cout << " GUI TOTAL DT(" << tmpT3-tmpT2 << ")" << std::endl;
++#endif
++      }
++
++      this->prevRenderTime = this->GetRealTime();
+     }
+ 
+     elapsedTime = (this->GetRealTime() - currTime);
+Index: server/XMLConfig.cc
+===================================================================
+--- server/XMLConfig.cc	(revision 7143)
++++ server/XMLConfig.cc	(working copy)
+@@ -513,29 +513,59 @@
+ ///////////////////////////////////////////////////////////////////////////
+ // Get a file name.  Always returns an absolute path.  If the filename
+ // is entered as a relative path, we prepend the world file path.
++// std::string XMLConfigNode::GetFilename( const std::string &key, const std::string &def, int require) const
++// {
++//   std::string filename = this->GetString( key, def, require );
++//
++//   if (filename.empty())
++//     return "";
++//
++//   if (filename[0] == '/' || filename[0] == '~')
++//     return filename;
++//   else
++//   {
++//     std::string result;
++//
++//     if (this->config->filename[0] != '/' && this->config->filename[0] != '~')
++//       result = "/";
++//
++//     unsigned int last = this->config->filename.rfind("/");
++//     if (last==0 || last+1 != this->config->filename.size())
++//       result += this->config->filename + "/" + filename;
++//     else
++//       result += this->config->filename.substr(0,last) + "/" + filename;
++//
++//     return result;
++//   }
++// }
++///////////////////////////////////////////////////////////////////////////
++// Get a file name.  Always returns an absolute path.  If the filename
++// is entered as a relative path, we prepend the world file path.
++//
++// patch by stu to do relative path.  FIXME: what was the original implementation that's broken?
++// sglaser: Was completely broken.  Now returns a path relative to the
++// (original) working directory.
+ std::string XMLConfigNode::GetFilename( const std::string &key, const std::string &def, int require) const
+ {
+   std::string filename = this->GetString( key, def, require );
+ 
+-  if (filename.empty())
+-    return "";
++  if (filename.empty() && require)
++  {
++    gzthrow("unable to find required filename attribute[" << key << "] in world file node["
++            << this->GetName() << "]");
++  }
++  else if (filename.empty())
++    return def;
+ 
+-  if (filename[0] == '/' || filename[0] == '~')
++  if (filename[0] == '/')
+     return filename;
+   else
+   {
+-    std::string result;
+-
+-    if (this->config->filename[0] != '/' && this->config->filename[0] != '~')
+-      result = "/";
+-
+-    unsigned int last = this->config->filename.rfind("/");
+-    if (last==0 || last+1 != this->config->filename.size())
+-      result += this->config->filename + "/" + filename;
++    int last_slash = this->config->filename.rfind("/");
++    if (last_slash < 0)
++      return filename;
+     else
+-      result += this->config->filename.substr(0,last) + "/" + filename;
+-
+-    return result;
++      return this->config->filename.substr(0,last_slash) + "/" + filename;
+   }
+ }
+ 
+Index: server/rendering/OgreVisual.cc
+===================================================================
+--- server/rendering/OgreVisual.cc	(revision 7143)
++++ server/rendering/OgreVisual.cc	(working copy)
+@@ -130,6 +130,7 @@
+         boost::lexical_cast<std::string>(this->meshTileP->GetValue().x) + "V" +
+         boost::lexical_cast<std::string>(this->meshTileP->GetValue().y);
+ 
++      if ( meshName != "unit_box_U1V1")
+       if (!this->sceneNode->getCreator()->hasEntity(meshName))
+       {
+         OgreSimpleShape::CreateBox(meshName, Vector3(1,1,1), **this->meshTileP);
+Index: server/GazeboConfig.cc
+===================================================================
+--- server/GazeboConfig.cc	(revision 7143)
++++ server/GazeboConfig.cc	(working copy)
+@@ -67,31 +67,34 @@
+     this->gazeboPaths.push_back(gazebo_resource_path);
+   }
+ 
+-  // if both paths are set, don't check the config file or use the defaults.
+-  if(ogre_resource_path && gazebo_resource_path) 
+-    return;
+-
+-
+   if (cfgFile)
+   {
+     XMLConfig rc;
+     XMLConfigNode *node;
+     rc.Load(rcFilename);
+ 
+-    node = rc.GetRootNode()->GetChild("gazeboPath");
+-    while (node)
++    // if gazebo path is set, skip reading from .gazeborc
++    if(!gazebo_resource_path)
+     {
+-      gzmsg(1) << "Gazebo Path[" << node->GetValue() << "]\n";
+-      this->gazeboPaths.push_back(node->GetValue());
+-      node = node->GetNext("gazeboPath");
++      node = rc.GetRootNode()->GetChild("gazeboPath");
++      while (node)
++      {
++        gzmsg(1) << "Gazebo Path[" << node->GetValue() << "]\n";
++        this->gazeboPaths.push_back(node->GetValue());
++        node = node->GetNext("gazeboPath");
++      }
+     }
+ 
+-    node = rc.GetRootNode()->GetChild("ogrePath");
+-    while (node)
++    // if ogre path is set, skip reading from .gazeborc
++    if(!ogre_resource_path)
+     {
+-      gzmsg(1) << "Ogre Path[" << node->GetValue() << "]\n";
+-      this->ogrePaths.push_back( node->GetValue() );
+-      node = node->GetNext("ogrePath");
++      node = rc.GetRootNode()->GetChild("ogrePath");
++      while (node)
++      {
++        gzmsg(1) << "Ogre Path[" << node->GetValue() << "]\n";
++        this->ogrePaths.push_back( node->GetValue() );
++        node = node->GetNext("ogrePath");
++      }
+     }
+     this->RTTMode = rc.GetRootNode()->GetString("RTTMode", "PBuffer");
+ 
+@@ -99,9 +102,18 @@
+   else
+   {
+     gzmsg(0) << "Unable to find the file ~/.gazeborc. Using default paths. This may cause OGRE to fail.\n";
+-    this->gazeboPaths.push_back("/usr/local/share/gazebo");
+-    this->ogrePaths.push_back("/usr/local/lib/OGRE");
+-    this->ogrePaths.push_back("/usr/lib/OGRE");
++
++    if ( !gazebo_resource_path )
++    {
++	this->gazeboPaths.push_back("/usr/local/share/gazebo");
++    }
++
++    if ( !ogre_resource_path )
++    {
++	this->ogrePaths.push_back("/usr/local/lib/OGRE");
++	this->ogrePaths.push_back("/usr/lib/OGRE");
++    }
++
+     this->RTTMode="PBuffer";
+   }
+ }
+Index: server/Model.cc
+===================================================================
+--- server/Model.cc	(revision 7143)
++++ server/Model.cc	(working copy)
+@@ -47,6 +47,10 @@
+ #include "IfaceFactory.hh"
+ #include "Model.hh"
+ 
++#ifdef TIMING
++#include "Simulator.hh"// for timing
++#endif
++
+ using namespace gazebo;
+ 
+ uint Model::lightNumber = 0;
+@@ -305,7 +309,7 @@
+ 
+   return this->InitChild();
+ }
+-
++  
+ ////////////////////////////////////////////////////////////////////////////////
+ // Update the model
+ int Model::Update()
+@@ -316,6 +320,10 @@
+ 
+   Pose3d bodyPose, newPose, oldPose;
+ 
++#ifdef TIMING
++  double tmpT1 = Simulator::Instance()->GetWallTime();
++#endif
++
+   for (bodyIter=this->bodies.begin(); bodyIter!=this->bodies.end(); bodyIter++)
+   {
+     if (bodyIter->second)
+@@ -324,6 +332,11 @@
+     }
+   }
+ 
++#ifdef TIMING
++  double tmpT2 = Simulator::Instance()->GetWallTime();
++  std::cout << "       bodies dt (" << tmpT2-tmpT1 << ")";
++#endif
++
+   for (contIter=this->controllers.begin();
+        contIter!=this->controllers.end(); contIter++)
+   {
+@@ -332,6 +345,11 @@
+       contIter->second->Update();
+   }
+ 
++#ifdef TIMING
++  double tmpT3 = Simulator::Instance()->GetWallTime();
++  std::cout << " controllers dt (" << tmpT3-tmpT2 << ")";
++#endif
++
+   for (jointIter = this->joints.begin(); jointIter != this->joints.end(); jointIter++)
+   {
+     jointIter->second->Update();
+@@ -350,6 +368,11 @@
+     this->rpyP->SetValue(this->pose.rot);
+   }
+ 
++#ifdef TIMING
++  double tmpT4 = Simulator::Instance()->GetWallTime();
++  std::cout << " joints/canonical body dt (" << tmpT4-tmpT3 << ")" << std::endl;
++#endif
++
+   return this->UpdateChild();
+ }
+ 
+Index: server/gui/StatusBar.cc
+===================================================================
+--- server/gui/StatusBar.cc	(revision 7143)
++++ server/gui/StatusBar.cc	(working copy)
+@@ -25,6 +25,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <string.h>
+ #include <FL/Fl_Value_Output.H>
+ #include <FL/Fl_Output.H>
+ #include <FL/Fl_Button.H>
+Index: server/gui/GLWindow.cc
+===================================================================
+--- server/gui/GLWindow.cc	(revision 7143)
++++ server/gui/GLWindow.cc	(working copy)
+@@ -62,7 +62,7 @@
+ {
+   this->end();
+ 
+-  this->moveAmount = 1.0;
++  this->moveAmount = 0.1;
+   this->moveScale = 1;
+   this->rotateAmount = 0.5;
+ 
+Index: server/World.hh
+===================================================================
+--- server/World.hh	(revision 7143)
++++ server/World.hh	(working copy)
+@@ -92,6 +92,26 @@
+   /// \return Pointer to the physics engine
+   public: PhysicsEngine *GetPhysicsEngine() const;
+ 
++  /// Get the simulation time
++  /// \return The simulation time
++  public: double GetSimTime() const;
++
++  /// Get the pause time
++  /// \return The pause time
++  public: double GetPauseTime() const;
++
++  /// Get the start time
++  /// \return The start time
++  public: double GetStartTime() const;
++
++  /// Get the real time (elapsed time)
++  /// \return The real time
++  public: double GetRealTime() const;
++
++  /// \brief Get the wall clock time
++  /// \return The wall clock time
++  public: double GetWallTime() const;
++
+   /// \brief Load all entities
+   /// \param node XMLConfg node pointer
+   /// \param parent Parent of the model to load
+@@ -186,6 +206,9 @@
+   /// Simulation interface
+   private: SimulationIface *simIface;
+ 
++  /// Current simulation time
++  private: double simTime, pauseTime, startTime;
++
+   private: friend class DestroyerT<World>;
+   private: friend class SingletonT<World>;
+ };
+Index: server/controllers/Controller.hh
+===================================================================
+--- server/controllers/Controller.hh	(revision 7143)
++++ server/controllers/Controller.hh	(working copy)
+@@ -105,6 +105,9 @@
+   /// \brief The entity that owns this controller
+   protected: Entity *parent;
+ 
++  /// \breif flag to keep controllers updating continuously
++  protected: ParamT<bool> *alwaysOnP;
++
+   /// \brief Update period 
+   protected: double updatePeriod;
+   protected: ParamT<double> *updatePeriodP;
+Index: server/controllers/camera/generic/Generic_Camera.cc
+===================================================================
+--- server/controllers/camera/generic/Generic_Camera.cc	(revision 7143)
++++ server/controllers/camera/generic/Generic_Camera.cc	(working copy)
+@@ -86,7 +86,24 @@
+ // Update the controller
+ void Generic_Camera::UpdateChild()
+ {
+-  this->PutCameraData();
++
++  // do this first so there's chance for sensor to run 1 frame after activate
++  if (this->myParent->IsActive())
++    this->PutCameraData();
++
++  // activate if iface open
++  if (this->cameraIface->Lock(1))
++  {
++    if (this->cameraIface->GetOpenCount() > 0)
++      this->myParent->SetActive(true);
++    else
++      this->myParent->SetActive(false);
++
++    //std::cout << " camera open count " << this->cameraIface->GetOpenCount() << std::endl;
++    this->cameraIface->Unlock();
++  }
++  //std::cout << " camera     active " << this->myParent->IsActive() << std::endl;
++
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+Index: server/controllers/Controller.cc
+===================================================================
+--- server/controllers/Controller.cc	(revision 7143)
++++ server/controllers/Controller.cc	(working copy)
+@@ -43,6 +43,7 @@
+ {
+   Param::Begin(&this->parameters);
+   this->nameP = new ParamT<std::string>("name","",1);
++  this->alwaysOnP = new ParamT<bool>("alwaysOn", false, 0);
+   this->updatePeriodP = new ParamT<double>("updateRate", 10, 0);
+   Param::End();
+ 
+@@ -60,6 +61,7 @@
+ {
+   this->Fini();
+   delete this->nameP;
++  delete this->alwaysOnP;
+   delete this->updatePeriodP;
+ }
+ 
+@@ -75,10 +77,17 @@
+   this->typeName = node->GetName();
+ 
+   this->nameP->Load(node);
++
++  this->alwaysOnP->Load(node);
++
+   this->updatePeriodP->Load(node);
+-  this->updatePeriod = 1.0 / (this->updatePeriodP->GetValue() + 1e-6);
+ 
+-  this->lastUpdate = -1e6;
++  double updateRate  = this->updatePeriodP->GetValue();
++  if (updateRate == 0)
++    this->updatePeriod = 0.0; // no throttling if updateRate is 0
++  else
++    this->updatePeriod = 1.0 / updateRate;
++  this->lastUpdate   = Simulator::Instance()->GetSimTime();
+ 
+   childNode = node->GetChildByNSPrefix("interface");
+ 
+@@ -178,7 +187,7 @@
+ /// Update the controller. Called every cycle.
+ void Controller::Update()
+ {
+-  if (this->IsConnected())
++  if (this->IsConnected() || this->alwaysOnP->GetValue())
+   {
+     if (lastUpdate + updatePeriod <= Simulator::Instance()->GetSimTime())
+     {
+@@ -210,6 +219,10 @@
+ {
+   std::vector<Iface*>::const_iterator iter;
+ 
++  // if the alwaysOn flag is true, this controller is connected
++  if (this->alwaysOnP->GetValue())
++    return true;
++
+   for (iter=this->ifaces.begin(); iter!=this->ifaces.end(); iter++)
+   {
+     if ((*iter)->GetOpenCount() > 0)
+Index: server/controllers/factory/Factory.cc
+===================================================================
+--- server/controllers/factory/Factory.cc	(revision 7143)
++++ server/controllers/factory/Factory.cc	(working copy)
+@@ -85,6 +85,7 @@
+   // If there is a string, then add the contents to the world
+   if (strcmp((const char*)this->factoryIface->data->newModel,"")!=0)
+   {
++    std::cout << " factory update: " << this->factoryIface->data->newModel << std::endl;
+     std::string xmlString;
+     std::string xmlMiddle = (const char*)(this->factoryIface->data->newModel);
+ 
+Index: server/controllers/ptz/generic/Generic_PTZ.cc
+===================================================================
+--- server/controllers/ptz/generic/Generic_PTZ.cc	(revision 7143)
++++ server/controllers/ptz/generic/Generic_PTZ.cc	(working copy)
+@@ -70,10 +70,10 @@
+ // Destructor
+ Generic_PTZ::~Generic_PTZ()
+ {
+-  if (this->panJoint)
+-    delete this->panJoint;
+-  if (this->tiltJoint)
+-    delete this->tiltJoint;
++  //if (this->panJoint)
++  //  delete this->panJoint;
++  //if (this->tiltJoint)
++  //  delete this->tiltJoint;
+ 
+   this->panJoint = NULL;
+   this->tiltJoint = NULL;
+Index: server/World.cc
+===================================================================
+--- server/World.cc	(revision 7143)
++++ server/World.cc	(working copy)
+@@ -27,6 +27,7 @@
+ #include <assert.h>
+ #include <sstream>
+ #include <fstream>
++#include <sys/time.h> //gettimeofday
+ 
+ #include "Global.hh"
+ #include "GazeboError.hh"
+@@ -57,6 +58,9 @@
+   this->server = NULL;
+   this->simIface = NULL;
+ 
++  this->simTime = 0.0;
++  this->pauseTime = 0.0;
++  this->startTime = 0.0;
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -172,6 +176,7 @@
+ 
+   this->physicsEngine->Init();
+ 
++  this->startTime = this->GetWallTime();
+   this->toAddModels.clear();
+   this->toDeleteModels.clear();
+ 
+@@ -185,6 +190,12 @@
+   std::vector< Model* >::iterator miter;
+   std::vector< Model* >::iterator miter2;
+ 
++  this->simTime += this->physicsEngine->GetStepTime();
++
++#ifdef TIMING
++  double tmpT1 = this->GetWallTime();
++#endif
++
+   // Update all the models
+   for (miter=this->models.begin(); miter!=this->models.end(); miter++)
+   {
+@@ -194,14 +205,33 @@
+     }
+   }
+ 
++#ifdef TIMING
++  double tmpT2 = this->GetWallTime();
++  std::cout << " models update dt(" << tmpT2-tmpT1 << ")" << std::endl;
++#endif
++
+   if (!Simulator::Instance()->IsPaused() &&
+        Simulator::Instance()->GetPhysicsEnabled())
+   {
+     this->physicsEngine->Update();
+   }
++  else
++  {
++    this->pauseTime += this->physicsEngine->GetStepTime();
++  }
+ 
++#ifdef TIMING
++  double tmpT3 = this->GetWallTime();
++  std::cout << " physics engine dt(" << tmpT3-tmpT2 << ")" << std::endl;
++#endif
++
+   this->UpdateSimulationIface();
+ 
++#ifdef TIMING
++  double tmpT4 = this->GetWallTime();
++  std::cout << " sim Iface dt(" << tmpT4-tmpT3 << ")" << std::endl;
++#endif
++
+   // Copy the newly created models into the main model vector
+   std::copy(this->toAddModels.begin(), this->toAddModels.end(),
+             std::back_inserter(this->models));
+@@ -219,6 +249,11 @@
+ 
+   this->toDeleteModels.clear();
+ 
++#ifdef TIMING
++  double tmpT5 = this->GetWallTime();
++  std::cout << " add/del models dt(" << tmpT5-tmpT4 << ")" << std::endl;
++#endif
++
+   return 0;
+ }
+ 
+@@ -273,6 +308,41 @@
+   return this->physicsEngine;
+ }
+ 
++////////////////////////////////////////////////////////////////////////////////
++// Get the simulation time
++double World::GetSimTime() const
++{
++  return this->simTime;
++}
++////////////////////////////////////////////////////////////////////////////////
++// Get the pause time
++double World::GetPauseTime() const
++{
++  return this->pauseTime;
++}
++
++////////////////////////////////////////////////////////////////////////////////
++/// Get the start time
++double World::GetStartTime() const
++{
++  return this->startTime;
++}
++////////////////////////////////////////////////////////////////////////////////
++/// Get the real time (elapsed time)
++double World::GetRealTime() const
++{
++  return this->GetWallTime() - this->startTime;
++}
++
++////////////////////////////////////////////////////////////////////////////////
++/// Get the wall clock time
++double World::GetWallTime() const
++{
++  struct timeval tv;
++  gettimeofday(&tv, NULL);
++  return tv.tv_sec + tv.tv_usec * 1e-6;
++}
++
+ ///////////////////////////////////////////////////////////////////////////////
+ // Load a model
+ int World::LoadEntities(XMLConfigNode *node, Model *parent)
+Index: SConstruct
+===================================================================
+--- SConstruct	(revision 7143)
++++ SConstruct	(working copy)
+@@ -5,7 +5,7 @@
+ 
+ exec(open('build.py'))
+ 
+-PKG_CONFIG_VERSION = '0.23'
++PKG_CONFIG_VERSION = '0.21'
+ OGRE_VERSION = '= 1.4.9'
+ ODE_VERSION = '>= 0.10.1'
+ 
+@@ -26,8 +26,9 @@
+ # 3rd party packages
+ #
+ parseConfigs=['pkg-config --cflags --libs OGRE',
++              'pkg-config --cflags --libs freeimage', 
++              'ode-config --cflags --libs', 
+               'xml2-config --cflags --libs', 
+-      	      'ode-config --cflags --libs',
+               'fltk-config --cflags --libs --ldflags --use-gl --use-images',
+               'pkg-config --cflags --libs xft'
+               ]
+@@ -35,6 +36,8 @@
+ #
+ # setup the build environment
+ #
++#  CC = '/opt/intel/cc/10.1.008/bin/icc',
++#  CXX = '/opt/intel/cc/10.1.008/bin/icpc',
+ env = Environment (
+   CC = 'g++',
+ 
+@@ -86,7 +89,7 @@
+ rcconfig = env.RCConfig(target='gazeborc', source=Value(install_prefix))
+ 
+ # DEFAULT list of subdirectories to build
+-subdirs = ['libgazebo','server', 'player']
++subdirs = ['libgazebo','server']
+ 
+ # Set the compile mode
+ if env['mode'] == 'debug':
