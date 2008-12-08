@@ -1,0 +1,10 @@
+# sets the robot's active degrees of freedom
+string sessionname
+int32 sessionid
+
+int32 bodyid
+float32[] values
+
+# indices into the active degree of freedom table
+uint8[] indices
+---

@@ -1,0 +1,880 @@
+<?xml version="1.0"?>
+<robot xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface">
+
+  <property name="M_PI" value="3.1415926535897931" />
+  <property name="VELOCITY_LIMIT_SCALE" value="0.6" />
+
+  <property name="shoulder_lift_length" value="0.10" />
+  <property name="shoulder_lift_radius" value="0.12" />
+  <property name="gripper_max_angle" value="0.8" />
+
+
+  <macro name="pr2_finger" params="prefix parent">
+
+    <!-- Finger proximal digit -->
+
+    <joint name="${prefix}_l_finger_joint" type="revolute">
+      <axis xyz="0 0 1" />
+      <anchor xyz="0 0 0" />
+      <limit effort="100" min="0" max="${gripper_max_angle}" />
+      <calibration reference_position="0" values="0 0" />
+      <joint_properties damping="0.1" />
+    </joint>
+
+    <link name="${prefix}_l_finger_link">
+      <parent name="${parent}_link" />
+      <origin xyz="0.07751 ${1*0.01} 0" rpy="0 0 0" />
+
+      <joint name="${prefix}_l_finger_joint" />
+      <inertial>
+        <mass value="0.1" />
+        <com xyz="0 0 0" />
+        <inertia  ixx="0.012430552544" ixy="-0.000003671102" ixz="0.000029379389"
+                  iyy="0.013567548848" iyz="-0.000427679042"
+                  izz="0.001755089866" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Shell</elem>
+        </map>
+        <geometry name="${prefix}_l_finger_visual">
+          <mesh filename="upper_finger_l" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry name="${prefix}_l_finger_collision">
+          <box size="0.131 0.056 0.049" />
+        </geometry>
+        <verbose value="Yes" />
+      </collision>
+      <map name="${prefix}_l_finger_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <!-- Finger proximal digit -->
+
+    <joint name="${prefix}_r_finger_joint" type="revolute">
+      <axis xyz="0 0 1" />
+      <anchor xyz="0 0 0" />
+      <limit effort="100" min="${-gripper_max_angle}" max="0" />
+      <calibration reference_position="0" values="0 0" />
+      <joint_properties damping="0.1" />
+      <mimic name="${prefix}_l_finger_joint" mult="${-1}" offset="0"/>
+      <map name="${prefix}_r_finger_mimic" flag="gazebo">
+        <elem key="mimicKp">1000.0</elem>
+        <elem key="mimicKd"> 0.0</elem>
+        <elem key="mimicFMax">10000.0</elem>
+      </map>
+    </joint>
+
+    <link name="${prefix}_r_finger_link">
+      <parent name="${parent}_link" />
+      <origin xyz="0.07751 ${-1*0.01} 0" rpy="0 0 0" />
+
+      <joint name="${prefix}_r_finger_joint" />
+      <inertial>
+        <mass value="0.1" />
+        <com xyz="0 0 0" />
+        <inertia  ixx="0.012430552544" ixy="-0.000003671102" ixz="0.000029379389"
+                  iyy="0.013567548848" iyz="-0.000427679042"
+                  izz="0.001755089866" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Shell</elem>
+        </map>
+        <geometry name="${prefix}_r_finger_visual">
+          <mesh filename="upper_finger_r" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry name="${prefix}_r_finger_collision">
+          <box size="0.131 0.056 0.049" />
+        </geometry>
+        <verbose value="Yes" />
+      </collision>
+      <map name="${prefix}_r_finger_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <!-- Finger tip -->
+
+    <joint name="${prefix}_l_finger_tip_joint" type="revolute">
+      <axis xyz="0 0 1" />
+      <anchor xyz="0 0 0" />
+      <limit effort="100" min="${-gripper_max_angle}" max="0" />
+      <calibration reference_position="0" values="0 0" />
+      <safety_limit_min spring_constant="10.0" safety_length="0.1" damping_constant="0.1"/>
+      <safety_limit_max spring_constant="10.0" safety_length="0.1" damping_constant="0.1"/>
+      <joint_properties damping="0.1" />
+      <mimic name="${prefix}_l_finger_joint" mult="-1" offset="0"/>
+      <map name="${prefix}_l_finger_tip_mimic" flag="gazebo">
+        <elem key="mimicKp">1000.0</elem>
+        <elem key="mimicKd"> 0.0</elem>
+        <elem key="mimicFMax">10000.0</elem>
+      </map>
+    </joint>
+
+    <link name="${prefix}_l_finger_tip_link">
+      <parent name="${prefix}_l_finger_link" />
+      <origin xyz="0.0915 0 0" rpy=" 0 0 0 " />
+
+      <joint name="${prefix}_l_finger_tip_joint" />
+      <inertial>
+        <mass value="0.1" />
+        <com xyz=" 0 0 0 " />
+        <inertia  ixx="0.012430552544" ixy="-0.000003671102" ixz="0.000029379389"
+                  iyy="0.013567548848" iyz="-0.000427679042"
+                  izz="0.001755089866" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0 " rpy="0 0 0 " />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Green</elem>
+        </map>
+        <geometry name="${prefix}_l_finger_tip_visual">
+          <mesh filename="finger_tip_l" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0 " rpy="0 0 0" />
+        <geometry name="${prefix}_l_finger_tip_collision">
+          <box size="0.053 0.04 0.023" />
+        </geometry>
+        <verbose value="Yes" />
+      </collision>
+      <map name="${prefix}_l_finger_tip_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <!-- Finger tip -->
+
+    <joint name="${prefix}_r_finger_tip_joint" type="revolute">
+      <axis xyz="0 0 1" />
+      <anchor xyz="0 0 0" />
+      <limit effort="100" min="0" max="${gripper_max_angle}" />
+      <calibration reference_position="0" values="0 0" />
+      <safety_limit_min spring_constant="10.0" safety_length="0.1" damping_constant="0.1"/>
+      <safety_limit_max spring_constant="10.0" safety_length="0.1" damping_constant="0.1"/>
+      <joint_properties damping="0.1" />
+      <mimic name="${prefix}_l_finger_joint" mult="1" offset="0"/>
+      <map name="${prefix}_r_finger_tip_mimic" flag="gazebo">
+        <elem key="mimicKp">1000.0</elem>
+        <elem key="mimicKd"> 0.0</elem>
+        <elem key="mimicFMax">10000.0</elem>
+      </map>
+    </joint>
+
+    <link name="${prefix}_r_finger_tip_link">
+      <parent name="${prefix}_r_finger_link" />
+      <origin xyz="0.0915 0 0" rpy=" 0 0 0 " />
+
+      <joint name="${prefix}_r_finger_tip_joint" />
+      <inertial>
+        <mass value="0.1" />
+        <com xyz=" 0 0 0 " />
+        <inertia  ixx="0.012430552544" ixy="-0.000003671102" ixz="0.000029379389"
+                  iyy="0.013567548848" iyz="-0.000427679042"
+                  izz="0.001755089866" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0 " rpy="0 0 0 " />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Green</elem>
+        </map>
+        <geometry name="${prefix}_r_finger_tip_visual">
+          <mesh filename="finger_tip_r" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0 " rpy="0 0 0" />
+        <geometry name="${prefix}_r_finger_tip_collision">
+          <box size="0.053 0.04 0.023" />
+        </geometry>
+        <verbose value="Yes" />
+      </collision>
+      <map name="${prefix}_r_finger_tip_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <map name="sensor" flag="gazebo">
+      <verbatim key="p3d_${prefix}_l_finger">
+        <controller:P3D name="p3d_${prefix}_l_finger_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${prefix}_l_finger_link</bodyName>
+          <topicName>${prefix}_l_finger_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${prefix}_l_finger_position_iface" />
+        </controller:P3D>
+      </verbatim>
+    </map>
+
+    <map name="sensor" flag="gazebo">
+      <verbatim key="p3d_${prefix}_l_finger_tip">
+        <!--
+        <controller:P3D name="p3d_${prefix}_l_finger_tip_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${prefix}_l_finger_tip_link</bodyName>
+          <topicName>${prefix}_l_finger_tip_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${prefix}_l_finger_tip_position_iface" />
+        </controller:P3D>
+        <controller:F3D name="f3d_${prefix}_l_finger_tip_controller" plugin="libF3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${prefix}_l_finger_tip_link</bodyName>
+          <topicName>${prefix}_l_finger_tip_force_ground_truth</topicName>
+          <frameName>map</frameName>
+          <interface:position name="f3d_${prefix}_l_finger_tip_position_iface" />
+        </controller:P3D>
+        -->
+      </verbatim>
+    </map>
+
+    <map name="sensor" flag="gazebo">
+      <verbatim key="p3d_${prefix}_r_finger">
+        <!--
+        <controller:P3D name="p3d_${prefix}_r_finger_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${prefix}_r_finger_link</bodyName>
+          <topicName>${prefix}_r_finger_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${prefix}_r_finger_position_iface" />
+        </controller:P3D>
+        -->
+      </verbatim>
+    </map>
+
+    <map name="sensor" flag="gazebo">
+      <verbatim key="p3d_${prefix}_r_finger_tip">
+        <!--
+        <controller:P3D name="p3d_${prefix}_r_finger_tip_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${prefix}_r_finger_tip_link</bodyName>
+          <topicName>${prefix}_r_finger_tip_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${prefix}_r_finger_tip_position_iface" />
+        </controller:P3D>
+        <controller:F3D name="f3d_${prefix}_r_finger_tip_controller" plugin="libF3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${prefix}_r_finger_tip_link</bodyName>
+          <topicName>${prefix}_r_finger_tip_force_ground_truth</topicName>
+          <frameName>map</frameName>
+          <interface:position name="f3d_${prefix}_r_finger_tip_position_iface" />
+        </controller:P3D>
+        -->
+      </verbatim>
+    </map>
+
+  </macro>
+
+
+
+  <macro name="pr2_gripper" params="side parent">
+    <joint name="${side}_gripper_palm_joint" type="fixed" />
+    <link name="${side}_gripper_palm_link">
+      <parent name="${parent}_link" />
+      <joint name="${side}_gripper_palm_joint" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <inertial>
+        <mass value="1.0" />
+        <com xyz="0.179474 -0.000058  0.013779" />
+        <inertia  ixx="1.0" ixy="-0.000003671102" ixz="0.000029379389"
+                  iyy="1.0" iyz="-0.000427679042" izz="1.0" />
+      </inertial>
+
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Red</elem>
+        </map>
+        <geometry name="${side}_gripper_roll_visual">
+          <mesh filename="wr_roll" />
+        </geometry>
+      </visual>
+
+      <collision>
+        <origin xyz="0.05 0 0" rpy="0 0 0" />
+        <geometry name="${side}_gripper_roll_collision">
+          <box size="0.11 0.10 0.05" />
+        </geometry>
+        <verbose value="Yes" />
+      </collision>
+
+      <map name="${side}_gripper_roll_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <map name="sensor" flag="gazebo">
+      <verbatim key="p3d_${side}_gripper_palm">
+        <controller:P3D name="p3d_${side}_gripper_palm_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_gripper_palm_link</bodyName>
+          <topicName>${side}_gripper_palm_pose_ground_truth</topicName>
+          <xyzOffsets>0 0 0</xyzOffsets>
+          <rpyOffsets>0 0 0</rpyOffsets>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_gripper_palm_position_iface" />
+        </controller:P3D>
+      </verbatim>
+    </map>
+
+
+    <pr2_finger prefix="${side}_gripper" parent="${side}_gripper_palm" />
+
+    <!--transmission type="GripperTransmission" name="${side}_gripper_trans">
+      <actuator name="${side}_gripper_motor" />
+      <joint name="${side}_gripper_r_finger_joint" reduction="-1000.0" />
+      <joint name="${side}_gripper_r_finger_tip_joint" reduction="1000.0" />
+      <joint name="${side}_gripper_l_finger_joint" reduction="1000.0" />
+      <joint name="${side}_gripper_l_finger_tip_joint" reduction="-1000.0" />
+      <pid p="0.01" i="0.001" d="0.005" iClamp="0.005" />
+    </transmission-->
+    <transmission type="SimpleTransmission" name="${side}_gripper_trans">
+      <actuator name="${side}_gripper_motor" />
+      <joint name="${side}_gripper_l_finger_joint" />
+      <mechanicalReduction>6.0</mechanicalReduction>
+    </transmission>
+
+  </macro>
+
+
+
+  <macro name="pr2_upper_arm" params="side parent reflect *origin">
+
+    <!-- Shoulder pan -->
+
+    <joint name="${side}_shoulder_pan_joint" type="revolute">
+      <axis xyz="0 0 1" />
+
+      <limit min="${reflect*M_PI/4-1.5}" max="${reflect*M_PI/4+1.5}"
+             effort="30" velocity="${VELOCITY_LIMIT_SCALE*3.48}"
+             k_position="100" k_velocity="10"
+             safety_length_min="0.15" safety_length_max="0.15" />
+      <calibration reference_position="${reflect*M_PI/4}" values="1.5 -1" />
+
+      <joint_properties damping="10.0" />
+    </joint>
+
+    <link name="${side}_shoulder_pan_link">
+      <parent name="${parent}_link" />
+      <insert_block name="origin" />
+      <joint name="${side}_shoulder_pan_joint" />
+      <inertial>
+        <mass value="16.29553" />
+        <com xyz="-0.005215 -0.030552 0.0" />
+        <inertia ixx="0.793291393007"  ixy="0.003412032973"  ixz="0.0096614481"
+                 iyy="0.818419457224"  iyz="-0.033999499551" izz="0.13915007406" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Blue</elem>
+        </map>
+        <geometry name="${side}_shoulder_pan_visual">
+          <mesh filename="shoulder_yaw" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0.05 0 -0.2" rpy="0 0 0 " />
+        <geometry name="${side}_shoulder_pan_collision">
+          <box size="0.347 0.254 0.646" />
+        </geometry>
+      </collision>
+      <map name="${side}_shoulder_pan_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <transmission type="SimpleTransmission" name="${side}_shoulder_pan_trans">
+      <actuator name="${side}_shoulder_pan_motor" />
+      <joint name="${side}_shoulder_pan_joint" />
+      <mechanicalReduction>63.16</mechanicalReduction>
+    </transmission>
+
+    <!-- Shoulder lift -->
+
+    <joint name="${side}_shoulder_lift_joint" type="revolute">
+      <axis xyz="0 1 0" />
+      <anchor xyz="0 0 0" />
+
+      <limit min="-0.4" max="1.5" effort="30" velocity="${VELOCITY_LIMIT_SCALE*3.47}"
+             k_position="100" k_velocity="10"
+             safety_length_min="0.1" safety_length_max="0.1" />
+      <calibration reference_position="0" values="1.5 -1 " />
+
+      <joint_properties damping="100.0" />
+    </joint>
+
+    <link name="${side}_shoulder_lift_link">
+      <parent name="${side}_shoulder_pan_link" />
+      <origin xyz="0.1 0 0" rpy="0 0 0" />
+      <joint name="${side}_shoulder_lift_joint" />
+      <inertial>
+        <mass value="2.41223" />
+        <com xyz="-0.035895  0.014422 -0.0028263" />
+        <inertia ixx="0.016640333585" ixy="0.002696462583"  ixz="0.001337742275"
+                 iyy="0.017232603914" iyz="-0.003605106514" izz="0.018723553425" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Grey</elem>
+        </map>
+        <geometry name="${side}_shoulder_lift_visual">
+          <mesh filename="shoulder_lift" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0 " rpy="${M_PI/2} 0 0" />
+        <geometry name="${side}_shoulder_lift_collision">
+          <cylinder radius="${shoulder_lift_radius}" length="${shoulder_lift_length}" />
+        </geometry>
+      </collision>
+      <map name="${side}_shoulder_lift_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <transmission type="SimpleTransmission" name="${side}_shoulder_lift_trans">
+      <actuator name="${side}_shoulder_lift_motor" />
+      <joint name="${side}_shoulder_lift_joint" />
+      <mechanicalReduction>57.36</mechanicalReduction>
+    </transmission>
+
+    <!-- Upperarm roll -->
+
+    <joint name="${side}_upper_arm_roll_joint" type="revolute">
+      <axis xyz="1 0 0" />
+      <anchor xyz="0 0 0" />
+
+      <limit min="-3.9" max="0.8" effort="30" velocity="${VELOCITY_LIMIT_SCALE*5.45}"
+             k_position="100" k_velocity="2"
+             safety_length_min="0.15" safety_length_max="0.15" />
+      <calibration reference_position="${-M_PI/2}" values="1.5 -1 " />
+
+      <joint_properties damping="1.0" />
+    </joint>
+
+    <link name="${side}_upper_arm_roll_link">
+      <parent name="${side}_shoulder_lift_link" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <joint name="${side}_upper_arm_roll_joint" />
+
+      <inertial>
+        <mass value="4.9481" />
+        <com xyz=" 0.21227 0.001205 -0.016293  " />
+        <inertia  ixx="10.0" ixy="0.000547745916"  ixz="0.000119476885"
+                  iyy="1.0"  iyz="0.001544932307"  izz="1.0" />
+      </inertial>
+
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Green</elem>
+        </map>
+        <geometry name="${side}_upper_arm_roll_visual">
+          <mesh filename="upperarm_roll" />
+        </geometry>
+      </visual>
+
+      <collision>
+        <origin xyz="0.3 0 0" rpy="0 0 0" />
+        <geometry name="${side}_upper_arm_roll_collision">
+          <box size="0.362 0.144 0.157" />
+        </geometry>
+      </collision>
+
+      <map name="${side}_upper_arm_roll_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <transmission type="SimpleTransmission" name="${side}_upper_arm_roll_trans">
+      <actuator name="${side}_upper_arm_roll_motor" />
+      <joint name="${side}_upper_arm_roll_joint" />
+      <mechanicalReduction>32.65</mechanicalReduction>
+    </transmission>
+
+    <!-- Elbow flex -->
+
+    <joint name="${side}_elbow_flex_joint" type="revolute">
+      <axis xyz="0 -1 0" />
+      <anchor xyz="0 0 0" />
+
+      <limit min="-0.1" max="2.3" effort="30" velocity="${VELOCITY_LIMIT_SCALE*5.5}"
+             k_position="100" k_velocity="3"
+             safety_length_min="0.1" safety_length_max="0.4" />
+      <calibration reference_position="1.1" values="1.5 -1" />
+
+      <joint_properties damping="10.0" />
+    </joint>
+
+    <link name="${side}_elbow_flex_link">
+      <parent name="${side}_upper_arm_roll_link" />
+      <origin xyz="0.4 0 0" rpy="0 0 0" />
+      <joint name="${side}_elbow_flex_joint" />
+
+      <inertial>
+        <mass value="1.689246" />
+        <com xyz="-0.011638  0.013173 0.001228 " />
+        <inertia  ixx="10.0" ixy="0.000292046674"  ixz="-0.000077359282"
+                  iyy="1.0"  iyz="-0.000001162155" izz="1.0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Grey</elem>
+        </map>
+        <geometry name="${side}_elbow_flex_visual">
+          <mesh filename="elbow_flex" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${M_PI/2} 0 0" />
+        <geometry name="${side}_elbow_flex_collision">
+          <cylinder radius="0.1" length="0.08" />
+        </geometry>
+      </collision>
+      <map name="${side}_elbow_flex_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <transmission type="SimpleTransmission" name="${side}_elbow_flex_trans">
+      <actuator name="${side}_elbow_flex_motor" />
+      <joint name="${side}_elbow_flex_joint" />
+      <mechanicalReduction>36.17</mechanicalReduction>
+    </transmission>
+
+    <map name="sensor" flag="gazebo">
+      <verbatim key="p3d_${side}_upper_arm">
+        <!--
+        <controller:P3D name="p3d_${side}_shoulder_pan_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_shoulder_pan_link</bodyName>
+          <topicName>${side}_shoulder_pan_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_shoulder_pan_position_iface" />
+        </controller:P3D>
+        <controller:P3D name="p3d_${side}_shoulder_lift_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_shoulder_lift_link</bodyName>
+          <topicName>${side}_shoulder_lift_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_shoulder_lift_position_iface" />
+        </controller:P3D>
+        <controller:P3D name="p3d_${side}_upper_arm_roll_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_upper_arm_roll_link</bodyName>
+          <topicName>${side}_upper_arm_roll_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_upper_arm_roll_position_iface" />
+        </controller:P3D>
+        <controller:P3D name="p3d_${side}_elbow_flex_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_elbow_flex_link</bodyName>
+          <topicName>${side}_elbow_flex_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_elbow_flex_position_iface" />
+        </controller:P3D>
+        -->
+      </verbatim>
+    </map>
+
+
+  </macro>
+
+
+
+  <macro name="pr2_forearm" params="side parent reflect">
+
+    <!-- Forearm roll -->
+
+    <joint name="${side}_forearm_roll_joint" type="revolute">
+      <axis xyz="-1 0 0" />
+      <anchor xyz="0 0 0" />
+
+      <limit effort="30" velocity="${VELOCITY_LIMIT_SCALE*6}" k_velocity="1" />
+      <calibration reference_position="0" values="1.5 -1" />
+
+      <joint_properties damping="1.0" />
+    </joint>
+
+    <link name="${side}_forearm_roll_link">
+      <parent name="${parent}_link" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <joint name="${side}_forearm_roll_joint" />
+      <inertial>
+        <mass value="1.804155" />
+        <com xyz="0.179474 -0.000058 0.013779" />
+        <inertia ixx="10.0" ixy="-0.000003671102" ixz="0.000029379389"
+                 iyy="1.0" iyz="-0.000427679042" izz="1.0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Blue</elem>
+        </map>
+        <geometry name="${side}_forearm_roll_visual">
+          <mesh filename="forearm_roll" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0.22 0 0" rpy="0 0 0" />
+        <geometry name="${side}_forearm_roll_collision">
+          <box size="0.27 0.12 0.08" />
+        </geometry>
+      </collision>
+      <map name="${side}_forearm_roll_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <transmission type="SimpleTransmission" name="${side}_forearm_roll_trans">
+      <actuator name="${side}_forearm_roll_motor" />
+      <joint name="${side}_forearm_roll_joint" />
+      <mechanicalReduction>${576/25*55/14}</mechanicalReduction>
+    </transmission>
+
+    <!-- Wrist flex -->
+
+    <joint name="${side}_wrist_flex_joint" type="revolute">
+      <axis xyz="0 -1 0" />
+      <anchor xyz="0 0 0" />
+
+      <limit min="-0.1" max="2.2" effort="200" velocity="${VELOCITY_LIMIT_SCALE*5.13}"
+             k_position="20" k_velocity="4"
+             safety_length_min="0.2" safety_length_max="0.2" />
+      <calibration reference_position="0.4" values="1.5 -1" />
+
+      <joint_properties damping="1.0" />
+    </joint>
+
+    <link name="${side}_wrist_flex_link">
+      <parent name="${side}_forearm_roll_link" />
+      <origin xyz="0.32025 0 0" rpy="0 0 0" />
+      <joint name="${side}_wrist_flex_joint" />
+      <inertial>
+        <mass value="0.1" />
+        <com xyz="0 0 0" />
+        <inertia ixx="1.0" ixy="-0.000003671102" ixz="0.000029379389"
+                 iyy="1.0" iyz="-0.000427679042" izz="1.0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Grey</elem>
+        </map>
+        <geometry name="${side}_wrist_flex_visual">
+          <mesh filename="wrist_flex" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${M_PI/2} 0 0" />
+        <geometry name="${side}_wrist_flex_collision">
+          <cylinder radius="0.033" length="0.103" />
+        </geometry>
+      </collision>
+      <map name="${side}_wrist_flex_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <!-- Wrist roll -->
+
+    <joint name="${side}_wrist_roll_joint" type="revolute">
+      <axis xyz="1 0 0" />
+      <anchor xyz="0 0 0" />
+      <limit effort="10" velocity="${VELOCITY_LIMIT_SCALE*6}" k_velocity="2" />
+      <calibration reference_position="1.27" values="1.5 -1" />
+      <joint_properties damping="1.0" />
+    </joint>
+
+
+    <link name="${side}_wrist_roll_link">
+      <parent name="${side}_wrist_flex_link" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <joint name="${side}_wrist_roll_joint" />
+      <inertial>
+        <mass value="1.0" />
+        <com xyz="0.179474 -0.000058  0.013779" />
+        <inertia ixx="1.0" ixy="-0.000003671102" ixz="0.000029379389"
+                 iyy="1.0" iyz="-0.000427679042" izz="1.0" />
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <map name="gazebo_material" flag="gazebo">
+          <elem key="material">Gazebo/Red</elem>
+        </map>
+        <geometry name="${side}_wrist_roll_visual">
+          <mesh filename="wr_roll" />
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0.05 0 0" rpy="0 0 0" />
+        <geometry name="${side}_wrist_roll_collision_">
+          <box size="0.11 0.10 0.05" />
+        </geometry>
+        <verbose value="Yes" />
+      </collision>
+      <map name="${side}_wrist_roll_gravity" flag="gazebo">
+        <elem key="turnGravityOff">true</elem>
+      </map>
+    </link>
+
+    <transmission type="WristTransmission" name="${side}_wrist_trans">
+      <rightActuator name="${side}_wrist_r_motor" />
+      <leftActuator name="${side}_wrist_l_motor" />
+      <flexJoint name="${side}_wrist_flex_joint" mechanicalReduction="${624/35*54/16}" />
+      <rollJoint name="${side}_wrist_roll_joint" mechanicalReduction="${624/35*54/16}" />
+    </transmission>
+
+    <map name="sensor" flag="gazebo">
+      <verbatim key="p3d_${side}_forearm">
+        <!--
+        <controller:P3D name="p3d_${side}_forearm_roll_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_forearm_roll_link</bodyName>
+          <topicName>${side}_forearm_roll_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_forearm_roll_position_iface" />
+        </controller:P3D>
+        <controller:P3D name="p3d_${side}_wrist_flex_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_wrist_flex_link</bodyName>
+          <topicName>${side}_wrist_flex_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_wrist_flex_position_iface" />
+        </controller:P3D>
+        <controller:P3D name="p3d_${side}_wrist_roll_controller" plugin="libP3D.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>1000.0</updateRate>
+          <bodyName>${side}_wrist_roll_link</bodyName>
+          <topicName>${side}_wrist_roll_pose_ground_truth</topicName>
+          <gaussianNoise>0.0</gaussianNoise>
+          <frameName>map</frameName>
+          <interface:position name="p3d_${side}_wrist_roll_position_iface" />
+        </controller:P3D>
+        -->
+      </verbatim>
+    </map>
+
+  </macro>
+
+
+
+  <macro name="pr2_arm" params="side parent reflect *origin">
+    <pr2_upper_arm side="${side}" reflect="${reflect}" parent="${parent}">
+      <insert_block name="origin" />
+    </pr2_upper_arm>
+    <pr2_forearm side="${side}" reflect="${reflect}" parent="${side}_elbow_flex" />
+  </macro>
+
+
+
+  <!--                    Calibration                            -->
+
+
+  <macro name="upper_arm_calibrator" params="side">
+    <controller name="${side}_cal_shoulder_pan" topic="${side}_cal_shoulder_pan"
+                type="JointCalibrationControllerNode">
+      <calibrate joint="${side}_shoulder_pan_joint"
+                 actuator="${side}_shoulder_pan_motor"
+                 transmission="${side}_shoulder_pan_trans"
+                 velocity="1.0" />
+      <pid p="7" i="0.5" d="0" iClamp="1.0" />
+    </controller>
+
+    <controller name="cal_shoulder_lift_${side}" topic="cal_shoulder_lift_${side}"
+                type="JointCalibrationControllerNode">
+      <calibrate joint="${side}_shoulder_lift_joint"
+                 actuator="${side}_shoulder_lift_motor"
+                 transmission="${side}_shoulder_lift_trans"
+                 velocity="-1.0" />
+      <pid p="7" i="0.5" d="0" iClamp="1.0" />
+    </controller>
+
+    <controller name="cal_${side}_upper_arm_roll" topic="cal_${side}_upper_arm_roll"
+                type="JointCalibrationControllerNode">
+      <calibrate joint="${side}_upper_arm_roll_joint"
+                 actuator="${side}_upper_arm_roll_motor"
+                 transmission="${side}_upper_arm_roll_trans"
+                 velocity="1.0" />
+      <pid p="6" i="0.2" d="0" iClamp="2.0" />
+    </controller>
+
+    <controller name="cal_${side}_elbow_flex" topic="cal_${side}_elbow_flex"
+                type="JointCalibrationControllerNode">
+      <calibrate joint="${side}_elbow_flex_joint"
+                 actuator="${side}_elbow_flex_motor"
+                 transmission="${side}_elbow_flex_trans"
+                 velocity="1.0" />
+      <pid p="6" i="0.2" d="0" iClamp="1.0" />
+    </controller>
+  </macro>
+
+
+  <macro name="forearm_calibrator" params="side">
+    <controller name="cal_${side}_forearm_roll" type="JointCalibrationControllerNode">
+      <calibrate joint="${side}_forearm_roll_joint"
+                 actuator="${side}_forearm_roll_motor"
+                 transmission="${side}_forearm_roll_trans"
+                 velocity="-1.2" />
+      <pid p="5.0" i="0" d="0" iClamp="0" />
+    </controller>
+
+    <controller type="WristCalibrationControllerNode" name="cal_wrist">
+      <calibrate transmission="${side}_wrist_trans"
+                 actuator_l="${side}_wrist_l_motor" actuator_r="${side}_wrist_r_motor"
+                 flex_joint="${side}_wrist_flex_joint" roll_joint="${side}_wrist_roll_joint"
+                 velocity="1.2" />
+      <pid p="3.0" i="0.2" d="0" iClamp="2.0" />
+    </controller>
+  </macro>
+
+
+  <macro name="gripper_calibrator" params="side">
+    <controller name="cal_${side}_gripper" type="GripperCalibrationControllerNode">
+      <calibrate joint="${side}_gripper_r_finger_joint"
+                 actuator="${side}_gripper_motor"
+                 velocity="10" />
+      <pid p="15" i="0" d="0" iClamp="0" />
+    </controller>
+  </macro>
+
+</robot>

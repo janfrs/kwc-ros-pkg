@@ -1,0 +1,5 @@
+string xml_config
+---
+uint8[] ok
+string[] name
+string[] error
