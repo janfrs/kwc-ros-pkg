@@ -1,0 +1,20 @@
+# Starts an openrave instance. This instance will have exclusive control over every object
+# that gets loaded.
+
+# creates an openrave session
+int32 sessionid
+
+# if non-zero, environment is cloned from the environment pointed by clone_sessionid
+# a clone uses the same collision checker and physics engine as its parent
+int32 clone_sessionid
+
+# mask of Clone* options
+uint8 clone_options
+
+uint8 CloneBodies=1 # copy all bodies
+uint8 CloneViewer=2 # copy current viewer
+uint8 CloneSimulation=4 # copy simulation settings
+uint8 CloneRealControllers=8 # copy real robot controllers 
+
+---
+int32 sessionid
