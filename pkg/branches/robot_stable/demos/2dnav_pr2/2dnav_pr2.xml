@@ -23,7 +23,7 @@
     <param name="odom_estimation/exact_time_mode" value="true"/>
     <node pkg="robot_pose_ekf" type="robot_pose_ekf" />
 
-    <node pkg="map_server" type="map_server" args="$(find 2dnav_stage)/willow-full-0.025.pgm 0.025" respawn="false" />
+    <node pkg="map_server" type="map_server" args="$(find 2dnav_stage)/empty_room_5cm.pgm 0.05" respawn="false" />
     <!--<node pkg="map_server" type="map_server" args="$(find 2dnav_stage)/willow-full-0.05.pgm 0.05" respawn="false" />-->
     <param name="laser_x_offset" type="double" value=".275" />
     <param name="pf_laser_max_beams" value="20"/>
